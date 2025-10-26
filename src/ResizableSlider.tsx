@@ -1,10 +1,23 @@
-import React, { useState } from 'react';
-import { Rnd } from 'react-rnd';
+import React, { useState, CSSProperties, ReactNode } from 'react';
+import { Rnd, DraggableData, ResizableDelta, Position } from 'react-rnd';
 
-const ResizableSlider = ({ children, containerState, onContainerChange }) => {
+interface ContainerState {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface ResizableSliderProps {
+  children: ReactNode;
+  containerState: ContainerState;
+  onContainerChange: React.Dispatch<React.SetStateAction<ContainerState>>;
+}
+
+const ResizableSlider: React.FC<ResizableSliderProps> = ({ children, containerState, onContainerChange }) => {
   const [isEditing, setIsEditing] = useState(false);
 
-  const handleKnobClick = (e) => {
+  const handleKnobClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsEditing(!isEditing);
   };
@@ -12,7 +25,7 @@ const ResizableSlider = ({ children, containerState, onContainerChange }) => {
   const knobSize = 24;
   const borderWidth = isEditing ? 2 : 1;
 
-  const styles = {
+  const styles: { [key: string]: CSSProperties } = {
     container: {
       display: 'flex',
       justifyContent: 'center',
@@ -58,10 +71,10 @@ const ResizableSlider = ({ children, containerState, onContainerChange }) => {
     <Rnd
       size={{ width: containerState.width, height: containerState.height }}
       position={{ x: containerState.x, y: containerState.y }}
-      onDrag={(e, d) => {
+      onDrag={(_e, d: DraggableData) => {
         onContainerChange(prev => ({ ...prev, x: d.x, y: d.y }));
       }}
-      onResize={(e, direction, ref, delta, position) => {
+      onResize={(_e, _direction, ref: HTMLElement, _delta: ResizableDelta, position: Position) => {
         onContainerChange(prev => ({
           ...prev,
           width: ref.offsetWidth,

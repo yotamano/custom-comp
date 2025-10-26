@@ -1,4 +1,4 @@
-import React, { useState, lazy, Suspense, useEffect } from 'react';
+import React, { useState, lazy, Suspense, useEffect, CSSProperties } from 'react';
 import Editor from 'react-simple-code-editor';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-clike';
@@ -6,11 +6,17 @@ import 'prismjs/components/prism-javascript';
 import 'prismjs/components/prism-jsx';
 import 'prismjs/themes/prism.css';
 import { transform } from '@babel/standalone';
+import type { TransformOptions } from '@babel/core';
 
 import ResizableSlider from './ResizableSlider';
 
 const Component1 = lazy(() => import('../1'));
 const Component2 = lazy(() => import('../2'));
+
+interface CompiledResult {
+  component: React.ComponentType | null;
+  error: string | null;
+}
 
 const initialCode = `
 import React from 'react';
@@ -753,39 +759,148 @@ export default Gallery3D
 </manifest>
 `.trim();
 
-const compileCode = (code) => {
+const compileCode = (code: string): CompiledResult => {
   try {
-    const transformedCode = transform(code, {
+    const transformOptions: TransformOptions = {
       presets: ['react', 'env', 'typescript'],
-      filename: 'component.tsx', // Allow JSX parsing
-    }).code;
+      filename: 'component.tsx',
+    };
+    const transformedCode = transform(code, transformOptions).code;
+
+    if (!transformedCode) {
+      return { component: null, error: 'Transformation returned empty code.' };
+    }
     
-    const exports = {};
-    const require = (name) => {
+    const exports: { default?: React.ComponentType } = {};
+    const require = (name: string) => {
       if (name === 'react') return React;
       throw new Error(`Cannot find module '${name}'`);
     };
     
+    // eslint-disable-next-line no-new-func
     new Function('exports', 'require', transformedCode)(exports, require);
     
     if (exports.default) {
       return { component: exports.default, error: null };
     }
     return { component: null, error: 'No default export found.' };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error compiling code:", error);
-    return { component: null, error: error.message };
+    if (error instanceof Error) {
+      return { component: null, error: error.message };
+    }
+    return { component: null, error: 'An unknown error occurred during compilation.' };
   }
 };
 
+interface ParsedOutput {
+  designBrief: string;
+  reactCode: string;
+  css: string;
+  manifest: string;
+  component: React.ComponentType | null;
+  error: string | null;
+}
+
+interface CSVResult {
+  index: number;
+  prompt: string;
+  category: string;
+  generatedOutput: string;
+  manifest: string;
+}
+
+const parseCSV = (text: string): CSVResult[] => {
+  const records: string[][] = [];
+  const currentRecord: string[] = [];
+  let currentField = '';
+  let inQuotes = false;
+  
+  // Parse CSV character by character, properly handling quoted multiline fields
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const nextChar = text[i + 1];
+    
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        // Escaped quote inside quoted field
+        currentField += '"';
+        i++; // Skip next quote
+      } else {
+        // Toggle quote state
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      // Field separator
+      currentRecord.push(currentField);
+      currentField = '';
+    } else if (char === '\n' && !inQuotes) {
+      // Record separator (only if not inside quotes)
+      currentRecord.push(currentField);
+      currentField = '';
+      if (currentRecord.length > 0) {
+        records.push([...currentRecord]);
+        currentRecord.length = 0;
+      }
+    } else if (char === '\r' && nextChar === '\n' && !inQuotes) {
+      // Windows line ending
+      currentRecord.push(currentField);
+      currentField = '';
+      if (currentRecord.length > 0) {
+        records.push([...currentRecord]);
+        currentRecord.length = 0;
+      }
+      i++; // Skip \n
+    } else {
+      // Regular character
+      currentField += char;
+    }
+  }
+  
+  // Add last field and record if any
+  if (currentField || currentRecord.length > 0) {
+    currentRecord.push(currentField);
+    if (currentRecord.length > 0) {
+      records.push(currentRecord);
+    }
+  }
+  
+  if (records.length < 2) return [];
+  
+  // Parse header
+  const headers = records[0];
+  const indexIdx = headers.findIndex(h => h.trim() === 'index');
+  const promptIdx = headers.findIndex(h => h.trim() === 'prompt');
+  const categoryIdx = headers.findIndex(h => h.trim() === 'category');
+  const generatedOutputIdx = headers.findIndex(h => h.trim() === 'Generated Output');
+  const manifestIdx = headers.findIndex(h => h.trim() === 'manifest');
+  
+  // Parse data rows
+  const results: CSVResult[] = [];
+  for (let i = 1; i < records.length; i++) {
+    const record = records[i];
+    if (record.length > Math.max(indexIdx, promptIdx, categoryIdx, generatedOutputIdx, manifestIdx)) {
+      results.push({
+        index: parseInt(record[indexIdx] || '0'),
+        prompt: record[promptIdx] || '',
+        category: record[categoryIdx] || '',
+        generatedOutput: record[generatedOutputIdx] || '',
+        manifest: record[manifestIdx] || '',
+      });
+    }
+  }
+  
+  return results;
+};
+
 const App = () => {
-  const [selectedComponent, setSelectedComponent] = useState('1');
+  const [selectedComponent, setSelectedComponent] = useState('generated');
   const [code, setCode] = useState(initialCode);
-  const [compiledResult, setCompiledResult] = useState(() => compileCode(initialCode));
+  const [compiledResult, setCompiledResult] = useState<CompiledResult>(() => compileCode(initialCode));
   const [generatedOutput, setGeneratedOutput] = useState(initialGeneratedOutput);
   const [isMetadataPanelOpen, setIsMetadataPanelOpen] = useState(true);
 
-  const [parsedOutput, setParsedOutput] = useState({
+  const [parsedOutput, setParsedOutput] = useState<ParsedOutput>({
     designBrief: '',
     reactCode: '',
     css: '',
@@ -801,16 +916,35 @@ const App = () => {
     height: 400
   });
 
-  const parseAndCompileGeneratedOutput = (output) => {
+  const [csvResults, setCsvResults] = useState<CSVResult[]>([]);
+  const [currentCSVIndex, setCurrentCSVIndex] = useState(0);
+  const [isCSVMode, setIsCSVMode] = useState(false);
+
+  const parseAndCompileGeneratedOutput = (output: string) => {
     const designBriefMatch = output.match(/<design-brief>([\s\S]*?)<\/design-brief>/);
     const reactCodeMatch = output.match(/<react>([\s\S]*?)<\/react>/);
     const cssMatch = output.match(/<css>([\s\S]*?)<\/css>/);
     const manifestMatch = output.match(/<manifest>([\s\S]*?)<\/manifest>/);
 
     const designBrief = designBriefMatch ? designBriefMatch[1].trim() : 'Not found.';
-    const reactCode = reactCodeMatch ? reactCodeMatch[1].trim() : 'Not found.';
-    const css = cssMatch ? cssMatch[1].trim() : 'Not found.';
+    const reactCode = reactCodeMatch ? reactCodeMatch[1].trim() : '';
+    const css = cssMatch ? cssMatch[1].trim() : '';
     const manifest = manifestMatch ? manifestMatch[1].trim() : 'Not found.';
+
+    // Check if essential tags are missing
+    if (!reactCodeMatch) {
+      setParsedOutput({
+        designBrief: designBrief || 'No design brief found',
+        reactCode: '',
+        css: css || '',
+        manifest: manifest || '',
+        component: null,
+        error: isCSVMode 
+          ? '⚠️ Generation incomplete - Missing <react> tag. This row may have failed during generation. Use navigation to skip to the next result.'
+          : 'Error: <react> tag not found in output. Please ensure your pasted output contains <react>...</react> tags.',
+      });
+      return;
+    }
 
     // Remove the style import, as we inject CSS directly
     const sanitizedReactCode = reactCode.replace(new RegExp("import\\s+['\"]\\./style\\.css['\"];?\\s*\\n?"), '');
@@ -828,10 +962,88 @@ const App = () => {
   };
 
   useEffect(() => {
-    parseAndCompileGeneratedOutput(generatedOutput);
-  }, [generatedOutput]);
+    if (isCSVMode && csvResults.length > 0) {
+      const currentResult = csvResults[currentCSVIndex];
+      parseAndCompileGeneratedOutput(currentResult.generatedOutput);
+    } else {
+      parseAndCompileGeneratedOutput(generatedOutput);
+    }
+  }, [generatedOutput, isCSVMode, csvResults, currentCSVIndex]);
 
-  const handleCodeChange = (newCode) => {
+  useEffect(() => {
+    if (!isCSVMode || csvResults.length === 0) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        goToPreviousResult();
+      } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        goToNextResult();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isCSVMode, csvResults.length, currentCSVIndex]);
+
+  const handleCSVUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const results = parseCSV(text);
+      if (results.length > 0) {
+        setCsvResults(results);
+        setCurrentCSVIndex(0);
+        setIsCSVMode(true);
+        setSelectedComponent('generated');
+      } else {
+        alert('No valid results found in CSV file.');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const goToPreviousResult = () => {
+    if (currentCSVIndex > 0) {
+      setCurrentCSVIndex(currentCSVIndex - 1);
+    }
+  };
+
+  const goToNextResult = () => {
+    if (currentCSVIndex < csvResults.length - 1) {
+      setCurrentCSVIndex(currentCSVIndex + 1);
+    }
+  };
+
+  const goToNextValidResult = () => {
+    for (let i = currentCSVIndex + 1; i < csvResults.length; i++) {
+      const result = csvResults[i];
+      if (result.generatedOutput.includes('<react>')) {
+        setCurrentCSVIndex(i);
+        return;
+      }
+    }
+    // If no valid result found, stay at current position
+    alert('No more valid results found after this position.');
+  };
+
+  const goToPreviousValidResult = () => {
+    for (let i = currentCSVIndex - 1; i >= 0; i--) {
+      const result = csvResults[i];
+      if (result.generatedOutput.includes('<react>')) {
+        setCurrentCSVIndex(i);
+        return;
+      }
+    }
+    // If no valid result found, stay at current position
+    alert('No valid results found before this position.');
+  };
+
+  const handleCodeChange = (newCode: string) => {
     setCode(newCode);
     setCompiledResult(compileCode(newCode));
   };
@@ -850,7 +1062,13 @@ const App = () => {
         return RenderedComponent ? (
           <>
             <style>{parsedOutput.css}</style>
-            <RenderedComponent />
+            <RenderedComponent 
+              {...{
+                className: "generated-component",
+                id: "generated-component-1",
+                wix: {}
+              } as any}
+            />
           </>
         ) : <div>Compiling...</div>;
       }
@@ -858,309 +1076,457 @@ const App = () => {
         if (compiledResult.error) {
           return <div style={{ color: 'red', padding: '1rem' }}><strong>Error:</strong> {compiledResult.error}</div>;
         }
-        return compiledResult.component ? <compiledResult.component /> : <div>Compiling...</div>;
+        const LiveComponent = compiledResult.component;
+        return LiveComponent ? <LiveComponent /> : <div>Compiling...</div>;
       default:
         return null;
     }
   };
 
-  const buttonStyle = (isActive) => ({
+  const buttonStyle = (isActive: boolean): CSSProperties => ({
     width: '100%',
     padding: '12px 16px',
     margin: '4px 0',
     border: 'none',
     borderRadius: '8px',
-    background: isActive ? '#3498db' : '#ffffff',
+    background: isActive ? '#0070f3' : '#ffffff',
     color: isActive ? '#ffffff' : '#333333',
     cursor: 'pointer',
     fontSize: '14px',
     fontWeight: '500',
     textAlign: 'left',
     transition: 'all 0.2s ease',
-    boxShadow: isActive ? '0 2px 8px rgba(52, 152, 219, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
+    boxShadow: isActive ? '0 4px 14px 0 rgba(0, 118, 255, 0.39)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
   });
 
+  const handleButtonHover = (e: React.MouseEvent<HTMLButtonElement>, isHovering: boolean, isActive: boolean) => {
+    if (!isActive) {
+      const target = e.currentTarget;
+      target.style.background = isHovering ? '#f1f3f4' : '#ffffff';
+      target.style.transform = isHovering ? 'translateY(-1px)' : 'translateY(0)';
+    }
+  };
+
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', background: '#ffffff' }}>
       <div style={{ 
-        width: '280px', 
-        padding: '20px', 
-        borderRight: '1px solid #e1e8ed', 
-        overflowY: 'auto', 
-        background: '#f8f9fa',
-        boxShadow: '2px 0 8px rgba(0, 0, 0, 0.08)'
+        display: 'flex',
+        alignItems: 'center',
+        padding: '12px 24px', 
+        borderBottom: '1px solid #e5e7eb', 
+        background: '#ffffff',
       }}>
         <h2 style={{
-          marginTop: 0,
-          marginBottom: '20px',
-          fontSize: '20px',
+          margin: 0,
+          marginRight: '24px',
+          fontSize: '18px',
           fontWeight: '600',
-          color: '#2c3e50',
-          textAlign: 'center'
+          color: '#111827',
         }}>Components</h2>
         
-        <div style={{ marginBottom: '20px' }}>
+        <div style={{ display: 'flex', gap: '8px' }}>
           <button 
-            style={buttonStyle(selectedComponent === '1')}
+            style={navButtonStyle(selectedComponent === '1')}
             onClick={() => setSelectedComponent('1')}
-            onMouseEnter={(e) => {
-              if (selectedComponent !== '1') {
-                e.target.style.background = '#f1f3f4';
-                e.target.style.transform = 'translateY(-1px)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (selectedComponent !== '1') {
-                e.target.style.background = '#ffffff';
-                e.target.style.transform = 'translateY(0)';
-              }
-            }}
           >
             📊 Before/After Slider
           </button>
           
           <button 
-            style={buttonStyle(selectedComponent === '2')}
+            style={navButtonStyle(selectedComponent === '2')}
             onClick={() => setSelectedComponent('2')}
-            onMouseEnter={(e) => {
-              if (selectedComponent !== '2') {
-                e.target.style.background = '#f1f3f4';
-                e.target.style.transform = 'translateY(-1px)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (selectedComponent !== '2') {
-                e.target.style.background = '#ffffff';
-                e.target.style.transform = 'translateY(0)';
-              }
-            }}
           >
             🎨 Component 2
           </button>
           
           <button 
-            style={buttonStyle(selectedComponent === 'live')}
+            style={navButtonStyle(selectedComponent === 'live')}
             onClick={() => setSelectedComponent('live')}
-            onMouseEnter={(e) => {
-              if (selectedComponent !== 'live') {
-                e.target.style.background = '#f1f3f4';
-                e.target.style.transform = 'translateY(-1px)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (selectedComponent !== 'live') {
-                e.target.style.background = '#ffffff';
-                e.target.style.transform = 'translateY(0)';
-              }
-            }}
           >
             ⚡ Live Editor
           </button>
 
           <button 
-            style={buttonStyle(selectedComponent === 'generated')}
+            style={navButtonStyle(selectedComponent === 'generated')}
             onClick={() => setSelectedComponent('generated')}
-            onMouseEnter={(e) => {
-              if (selectedComponent !== 'generated') {
-                e.target.style.background = '#f1f3f4';
-                e.target.style.transform = 'translateY(-1px)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (selectedComponent !== 'generated') {
-                e.target.style.background = '#ffffff';
-                e.target.style.transform = 'translateY(0)';
-              }
-            }}
           >
             📄 Generated Output
           </button>
         </div>
         
-        {selectedComponent === 'live' && (
-          <div>
-            <h3 style={{
-              fontSize: '16px',
-              fontWeight: '500',
-              color: '#34495e',
-              marginBottom: '12px'
-            }}>Code Editor</h3>
-            <div style={{ 
-              border: '1px solid #d1d9e0', 
-              borderRadius: '8px', 
-              height: '350px', 
-              overflow: 'hidden', 
-              background: '#ffffff',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
-            }}>
-              <Editor
-                value={code}
-                onValueChange={handleCodeChange}
-                highlight={(code) => Prism.highlight(code, Prism.languages.jsx, 'jsx')}
-                padding={12}
-                style={{
-                  fontFamily: '"Fira Code", "SF Mono", Monaco, monospace',
-                  fontSize: 13,
-                  lineHeight: 1.5,
-                  height: '100%',
-                  overflow: 'auto'
-                }}
-              />
-            </div>
-          </div>
-        )}
-
-        {selectedComponent === 'generated' && (
-          <div style={{width: '100%'}}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '500', color: '#34495e' }}>
-                Paste Generated Output
-              </h3>
-              <button
-                onClick={() => setGeneratedOutput('')}
-                style={{
-                  padding: '6px 12px',
-                  border: '1px solid #d1d9e0',
-                  borderRadius: '6px',
-                  background: '#ffffff',
-                  color: '#34495e',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: '500',
-                  transition: 'all 0.2s ease',
-                }}
-                onMouseEnter={(e) => { e.target.style.background = '#f1f3f4'; e.target.style.borderColor = '#b1b9c0'; }}
-                onMouseLeave={(e) => { e.target.style.background = '#ffffff'; e.target.style.borderColor = '#d1d9e0'; }}
-              >
-                Clear
-              </button>
-            </div>
-            <textarea
-              value={generatedOutput}
-              onChange={(e) => setGeneratedOutput(e.target.value)}
-              style={{
-                width: '100%',
-                height: '400px',
-                fontFamily: '"Fira Code", "SF Mono", Monaco, monospace',
-                fontSize: 13,
-                border: '1px solid #d1d9e0',
-                borderRadius: '8px',
-                padding: '12px',
-                boxSizing: 'border-box',
-                resize: 'vertical',
-              }}
-            />
-          </div>
-        )}
-      </div>
-      <div style={{ 
-        flex: 1, 
-        padding: '20px', 
-        position: 'relative', 
-        background: '#f5f5f5',
-        minHeight: 0,
-        display: 'flex',
-        gap: '20px'
-      }}>
-        {selectedComponent === 'generated' ? (
-          <div style={{
-            display: 'flex',
-            width: '100%',
-            gap: '20px'
-          }}>
-            {isMetadataPanelOpen && (
-              <div style={{
-                flex: 1,
-                background: 'white',
-                padding: '20px',
-                borderRadius: '8px',
-                overflow: 'auto',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-                transition: 'all 0.3s ease',
-                minWidth: '300px'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                  <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#2c3e50' }}>Details</h2>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {selectedComponent === 'generated' && (
+            <>
+              <div>
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleCSVUpload}
+                  style={{ display: 'none' }}
+                  id="csv-upload"
+                />
+                <label
+                  htmlFor="csv-upload"
+                  style={{
+                    display: 'inline-block',
+                    padding: '8px 14px',
+                    border: '1px solid #2563eb',
+                    borderRadius: '6px',
+                    background: '#2563eb',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    transition: 'all 0.2s ease',
+                    border: 'none',
+                  }}
+                  onMouseEnter={(e) => { const target = e.currentTarget; target.style.background = '#1d4ed8'; }}
+                  onMouseLeave={(e) => { const target = e.currentTarget; target.style.background = '#2563eb'; }}
+                >
+                  📁 Upload CSV
+                </label>
+                {isCSVMode && csvResults.length > 0 && (
                   <button
-                    onClick={() => setIsMetadataPanelOpen(false)}
-                    style={{
-                      background: '#f1f3f4',
-                      border: '1px solid #e1e8ed',
-                      borderRadius: '50%',
-                      width: '28px',
-                      height: '28px',
-                      cursor: 'pointer',
-                      fontSize: '18px',
-                      padding: 0,
-                      lineHeight: '26px',
-                      color: '#5c6a77',
-                      transition: 'all 0.2s ease',
+                    onClick={() => {
+                      setIsCSVMode(false);
+                      setCsvResults([]);
+                      setCurrentCSVIndex(0);
                     }}
-                    onMouseEnter={(e) => { e.target.style.background = '#e1e8ed'; e.target.style.color = '#2c3e50'; }}
-                    onMouseLeave={(e) => { e.target.style.background = '#f1f3f4'; e.target.style.color = '#5c6a77'; }}
+                    style={{
+                      marginLeft: '8px',
+                      padding: '8px 12px',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '6px',
+                      background: '#ffffff',
+                      color: '#374151',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                    }}
                   >
-                    &times;
+                    ✕ Clear ({csvResults.length})
+                  </button>
+                )}
+              </div>
+
+              {isCSVMode && csvResults.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                   <button
+                    onClick={goToPreviousResult}
+                    disabled={currentCSVIndex === 0}
+                    style={paginationButtonStyle(currentCSVIndex === 0)}
+                  >
+                    ←
+                  </button>
+                  <select
+                    value={currentCSVIndex}
+                    onChange={(e) => setCurrentCSVIndex(parseInt(e.target.value))}
+                    style={{
+                      padding: '7px 10px',
+                      border: '1px solid #dcdcdc',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      background: '#ffffff',
+                      cursor: 'pointer',
+                      minWidth: '200px'
+                    }}
+                  >
+                    {csvResults.map((result, idx) => {
+                      const isValid = result.generatedOutput.includes('<react>');
+                      return (
+                        <option key={idx} value={idx}>
+                          {isValid ? '✓' : '✗'} #{result.index} - {result.prompt.substring(0, 25)}{result.prompt.length > 25 ? '...' : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <button
+                    onClick={goToNextResult}
+                    disabled={currentCSVIndex === csvResults.length - 1}
+                    style={paginationButtonStyle(currentCSVIndex === csvResults.length - 1)}
+                  >
+                    →
+                  </button>
+                   <button
+                    onClick={goToPreviousValidResult}
+                    style={paginationButtonStyle(false, true)}
+                  >
+                    ⏮
+                  </button>
+                  <button
+                    onClick={goToNextValidResult}
+                    style={paginationButtonStyle(false, true)}
+                  >
+                    ⏭
                   </button>
                 </div>
-                <h3 style={{ marginTop: 0 }}>Design Brief</h3>
-                <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '12px' }}>{parsedOutput.designBrief}</pre>
-                <hr style={{margin: '20px 0'}} />
-                <h3>Manifest</h3>
-                <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '12px' }}>{parsedOutput.manifest}</pre>
-              </div>
-            )}
-            <div style={{
-              flex: 1,
-              position: 'relative'
-            }}>
-              {!isMetadataPanelOpen && (
-                <button
-                  onClick={() => setIsMetadataPanelOpen(true)}
-                  style={{
-                    position: 'absolute',
-                    top: '0px',
-                    left: '0px',
-                    zIndex: 20,
-                    padding: '8px 16px',
-                    border: '1px solid #d1d9e0',
-                    borderRadius: '6px',
-                    background: '#ffffff',
-                    color: '#34495e',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                    transition: 'all 0.2s ease',
-                  }}
-                  onMouseEnter={(e) => { e.target.style.background = '#f1f3f4'; e.target.style.borderColor = '#b1b9c0'; }}
-                  onMouseLeave={(e) => { e.target.style.background = '#ffffff'; e.target.style.borderColor = '#d1d9e0'; }}
-                >
-                  Show Details
-                </button>
               )}
-              <Suspense fallback={<div>Loading...</div>}>
-                <ResizableSlider
-                  containerState={containerState}
-                  onContainerChange={setContainerState}
-                >
-                  {renderComponent()}
-                </ResizableSlider>
-              </Suspense>
+            </>
+          )}
+        </div>
+      </div>
+      <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+        <div style={{ 
+          width: selectedComponent === 'generated' && isCSVMode ? '0px' : '320px',
+          padding: selectedComponent === 'generated' && isCSVMode ? '0' : '24px',
+          borderRight: selectedComponent === 'generated' && isCSVMode ? 'none' : '1px solid #e5e7eb',
+          overflowY: 'auto', 
+          background: '#ffffff',
+          transition: 'all 0.3s ease-in-out',
+          overflowX: 'hidden',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          {selectedComponent === 'live' && (
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%'}}>
+              <h3 style={{
+                fontSize: '16px',
+                fontWeight: '600',
+                color: '#111827',
+                marginBottom: '16px',
+                flexShrink: 0
+              }}>Code Editor</h3>
+              <div style={{ 
+                border: '1px solid #d1d4d8', 
+                borderRadius: '8px', 
+                overflow: 'hidden', 
+                background: '#ffffff',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                flex: 1,
+                minHeight: 0
+              }}>
+                <Editor
+                  value={code}
+                  onValueChange={handleCodeChange}
+                  highlight={(c) => Prism.highlight(c, Prism.languages.jsx, 'jsx')}
+                  padding={12}
+                  style={{
+                    fontFamily: '"Fira Code", "SF Mono", Monaco, monospace',
+                    fontSize: 13,
+                    lineHeight: 1.5,
+                    height: '100%',
+                    overflow: 'auto'
+                  }}
+                />
+              </div>
             </div>
-          </div>
-        ) : (
-          <Suspense fallback={<div>Loading...</div>}>
-            <ResizableSlider 
-              containerState={containerState}
-              onContainerChange={setContainerState}
-            >
-              {renderComponent()}
-            </ResizableSlider>
-          </Suspense>
-        )}
+          )}
+
+          {selectedComponent === 'generated' && (
+            <div style={{width: '100%', display: 'flex', flexDirection: 'column', height: '100%'}}>
+              {!isCSVMode && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexShrink: 0 }}>
+                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '500', color: '#374151' }}>
+                      Paste Generated Output
+                    </h3>
+                    <button
+                      onClick={() => setGeneratedOutput('')}
+                      style={{
+                        padding: '6px 12px',
+                        border: '1px solid #d1d4d8',
+                        borderRadius: '6px',
+                        background: '#ffffff',
+                        color: '#374151',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        transition: 'all 0.2s ease',
+                      }}
+                      onMouseEnter={(e) => { const target = e.currentTarget; target.style.background = '#f9fafb'; }}
+                      onMouseLeave={(e) => { const target = e.currentTarget; target.style.background = '#ffffff'; }}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <textarea
+                    value={generatedOutput}
+                    onChange={(e) => setGeneratedOutput(e.target.value)}
+                    style={{
+                      width: '100%',
+                      fontFamily: '"Fira Code", "SF Mono", Monaco, monospace',
+                      fontSize: 13,
+                      border: '1px solid #d1d4d8',
+                      borderRadius: '8px',
+                      padding: '12px',
+                      boxSizing: 'border-box',
+                      resize: 'vertical',
+                      flex: 1
+                    }}
+                  />
+                </>
+              )}
+            </div>
+          )}
+        </div>
+        <div style={{ 
+          flex: 1, 
+          padding: '24px', 
+          position: 'relative', 
+          background: '#f9fafb',
+          minHeight: 0,
+          display: 'flex',
+          gap: '20px'
+        }}>
+          {selectedComponent === 'generated' ? (
+            <div style={{
+              display: 'flex',
+              width: '100%',
+              gap: '20px'
+            }}>
+              {isMetadataPanelOpen && (
+                <div style={{
+                  flex: 0.5,
+                  background: 'white',
+                  padding: '24px',
+                  borderRadius: '12px',
+                  overflow: 'auto',
+                  border: '1px solid #e5e7eb',
+                  transition: 'all 0.3s ease',
+                  minWidth: '250px',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#111827' }}>Details</h2>
+                    <button
+                      onClick={() => setIsMetadataPanelOpen(false)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '32px',
+                        height: '32px',
+                        cursor: 'pointer',
+                        fontSize: '20px',
+                        lineHeight: '32px',
+                        color: '#666666',
+                        transition: 'all 0.2s ease',
+                      }}
+                      onMouseEnter={(e) => { const target = e.currentTarget; target.style.background = '#f0f0f0'; target.style.color = '#111111'; }}
+                      onMouseLeave={(e) => { const target = e.currentTarget; target.style.background = 'transparent'; target.style.color = '#666666'; }}
+                    >
+                      &times;
+                    </button>
+                  </div>
+                  {isCSVMode && csvResults.length > 0 && (
+                    <>
+                      <div style={{
+                        background: '#f9fafb',
+                        padding: '16px',
+                        borderRadius: '8px',
+                        marginBottom: '20px',
+                        border: '1px solid #e5e7eb'
+                      }}>
+                        <h3 style={{ marginTop: 0, marginBottom: '12px', fontSize: '14px', fontWeight: '600', color: '#111827' }}>Prompt</h3>
+                        <p style={{ margin: 0, fontSize: '13px', lineHeight: '1.6', color: '#374151' }}>
+                          {csvResults[currentCSVIndex].prompt}
+                        </p>
+                        {csvResults[currentCSVIndex].category && (
+                          <>
+                            <h3 style={{ marginTop: '16px', marginBottom: '8px', fontSize: '14px', fontWeight: '600', color: '#111827' }}>Category</h3>
+                            <span style={{
+                              display: 'inline-block',
+                              background: '#eff6ff',
+                              color: '#2563eb',
+                              padding: '4px 10px',
+                              borderRadius: '9999px',
+                              fontSize: '12px',
+                              fontWeight: '500'
+                            }}>
+                              {csvResults[currentCSVIndex].category}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      <hr style={{margin: '24px 0', border: 'none', borderTop: '1px solid #e5e7eb'}} />
+                    </>
+                  )}
+                  <h3 style={{ marginTop: 0, fontSize: '16px', fontWeight: '600', color: '#111827' }}>Design Brief</h3>
+                  <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '12px', background: '#f9fafb', padding: '12px', borderRadius: '6px', border: '1px solid #e5e7eb' }}>{parsedOutput.designBrief}</pre>
+                  <hr style={{margin: '24px 0', border: 'none', borderTop: '1px solid #e5e7eb'}} />
+                  <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#111827' }}>Manifest</h3>
+                  <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '12px', background: '#f9fafb', padding: '12px', borderRadius: '6px', border: '1px solid #e5e7eb' }}>{parsedOutput.manifest}</pre>
+                </div>
+              )}
+              <div style={{
+                flex: 1.5,
+                position: 'relative'
+              }}>
+                {!isMetadataPanelOpen && (
+                  <button
+                    onClick={() => setIsMetadataPanelOpen(true)}
+                    style={{
+                      position: 'absolute',
+                      top: '0px',
+                      left: '0px',
+                      zIndex: 20,
+                      padding: '8px 12px',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '6px',
+                      background: '#ffffff',
+                      color: '#374151',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                      transition: 'all 0.2s ease',
+                    }}
+                    onMouseEnter={(e) => { const target = e.currentTarget; target.style.background = '#f9fafb'; }}
+                    onMouseLeave={(e) => { const target = e.currentTarget; target.style.background = '#ffffff'; }}
+                  >
+                    Show Details
+                  </button>
+                )}
+                <Suspense fallback={<div>Loading...</div>}>
+                  <ResizableSlider
+                    containerState={containerState}
+                    onContainerChange={setContainerState}
+                  >
+                    {renderComponent()}
+                  </ResizableSlider>
+                </Suspense>
+              </div>
+            </div>
+          ) : (
+            <Suspense fallback={<div>Loading...</div>}>
+              <ResizableSlider 
+                containerState={containerState}
+                onContainerChange={setContainerState}
+              >
+                {renderComponent()}
+              </ResizableSlider>
+            </Suspense>
+          )}
+        </div>
       </div>
     </div>
   );
 };
+
+const navButtonStyle = (isActive: boolean): CSSProperties => ({
+  padding: '8px 16px',
+  margin: 0,
+  border: 'none',
+  borderRadius: '6px',
+  background: isActive ? '#f3f4f6' : 'transparent',
+  color: isActive ? '#1f2937' : '#6b7280',
+  cursor: 'pointer',
+  fontSize: '14px',
+  fontWeight: '500',
+  textAlign: 'center',
+  transition: 'all 0.2s ease',
+});
+
+const paginationButtonStyle = (disabled: boolean, isSecondary: boolean = false): CSSProperties => ({
+  padding: '8px 12px',
+  border: `1px solid ${isSecondary ? '#16a34a' : '#e5e7eb'}`,
+  borderRadius: '6px',
+  background: disabled ? '#f9fafb' : '#ffffff',
+  color: disabled ? '#9ca3af' : isSecondary ? '#16a34a' : '#374151',
+  cursor: disabled ? 'not-allowed' : 'pointer',
+  fontSize: '14px',
+  fontWeight: '500',
+  transition: 'all 0.2s ease',
+});
+
 
 export default App;

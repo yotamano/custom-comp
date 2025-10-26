@@ -1,6 +1,18 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, CSSProperties } from 'react';
 
-const BeforeAfterSlider = ({
+interface BeforeAfterSliderProps {
+  beforeImage?: string;
+  afterImage?: string;
+  beforeLabel?: string;
+  afterLabel?: string;
+  initialPosition?: number;
+  showLabels?: boolean;
+  height?: number;
+  borderRadius?: number;
+  className?: string;
+}
+
+const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
   beforeImage = "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop",
   afterImage = "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop&sat=2&con=1.2",
   beforeLabel = "Before",
@@ -14,11 +26,10 @@ const BeforeAfterSlider = ({
   const [sliderPosition, setSliderPosition] = useState(initialPosition);
   const [isDragging, setIsDragging] = useState(false);
   const [isLoaded, setIsLoaded] = useState({ before: false, after: false });
-  const containerRef = useRef(null);
-  const animationRef = useRef(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Handle mouse/touch move
-  const handleMove = useCallback((clientX) => {
+  const handleMove = useCallback((clientX: number) => {
     if (!containerRef.current) return;
 
     const rect = containerRef.current.getBoundingClientRect();
@@ -29,12 +40,12 @@ const BeforeAfterSlider = ({
   }, []);
 
   // Mouse events
-  const handleMouseDown = (e) => {
+  const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
     handleMove(e.clientX);
   };
 
-  const handleMouseMove = useCallback((e) => {
+  const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging) return;
     e.preventDefault();
     handleMove(e.clientX);
@@ -45,12 +56,12 @@ const BeforeAfterSlider = ({
   }, []);
 
   // Touch events
-  const handleTouchStart = (e) => {
+  const handleTouchStart = (e: React.TouchEvent) => {
     setIsDragging(true);
     handleMove(e.touches[0].clientX);
   };
 
-  const handleTouchMove = useCallback((e) => {
+  const handleTouchMove = useCallback((e: TouchEvent) => {
     if (!isDragging) return;
     e.preventDefault();
     handleMove(e.touches[0].clientX);
@@ -78,12 +89,12 @@ const BeforeAfterSlider = ({
   }, [isDragging, handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
 
   // Handle image loading
-  const handleImageLoad = (type) => {
+  const handleImageLoad = (type: 'before' | 'after') => {
     setIsLoaded(prev => ({ ...prev, [type]: true }));
   };
 
   // Keyboard navigation
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     const step = 5;
     if (e.key === 'ArrowLeft') {
       setSliderPosition(prev => Math.max(0, prev - step));
@@ -92,7 +103,7 @@ const BeforeAfterSlider = ({
     }
   };
 
-  const containerStyles = {
+  const containerStyles: CSSProperties = {
     position: 'relative',
     height: `${height}px`,
     borderRadius: `${borderRadius}px`,
@@ -105,7 +116,7 @@ const BeforeAfterSlider = ({
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
   };
 
-  const imageStyles = {
+  const imageStyles: CSSProperties = {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -115,18 +126,18 @@ const BeforeAfterSlider = ({
     transition: 'opacity 0.5s ease'
   };
 
-  const beforeImageStyles = {
+  const beforeImageStyles: CSSProperties = {
     ...imageStyles,
     clipPath: `inset(0 ${100 - sliderPosition}% 0 0)`,
     transition: isDragging ? 'none' : 'clip-path 0.1s ease-out'
   };
 
-  const afterImageStyles = {
+  const afterImageStyles: CSSProperties = {
     ...imageStyles,
     opacity: isLoaded.after ? 1 : 0
   };
 
-  const sliderLineStyles = {
+  const sliderLineStyles: CSSProperties = {
     position: 'absolute',
     top: 0,
     left: `${sliderPosition}%`,
@@ -139,7 +150,7 @@ const BeforeAfterSlider = ({
     zIndex: 3
   };
 
-  const sliderHandleStyles = {
+  const sliderHandleStyles: CSSProperties & { '&:hover'?: CSSProperties; '&:focus'?: CSSProperties } = {
     position: 'absolute',
     top: '50%',
     left: `${sliderPosition}%`,
@@ -165,20 +176,20 @@ const BeforeAfterSlider = ({
     }
   };
 
-  const arrowStyles = {
+  const arrowStyles: CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     gap: '2px'
   };
 
-  const arrowIconStyles = {
+  const arrowIconStyles: CSSProperties = {
     width: '6px',
     height: '6px',
     borderTop: '2px solid #6c757d',
     borderRight: '2px solid #6c757d'
   };
 
-  const labelStyles = {
+  const labelStyles: CSSProperties = {
     position: 'absolute',
     top: '20px',
     padding: '8px 16px',
@@ -193,21 +204,21 @@ const BeforeAfterSlider = ({
     zIndex: 2
   };
 
-  const beforeLabelStyles = {
+  const beforeLabelStyles: CSSProperties = {
     ...labelStyles,
     left: '20px',
     opacity: sliderPosition > 10 ? 1 : 0,
     transform: `translateY(${sliderPosition > 10 ? 0 : -10}px)`
   };
 
-  const afterLabelStyles = {
+  const afterLabelStyles: CSSProperties = {
     ...labelStyles,
     right: '20px',
     opacity: sliderPosition < 90 ? 1 : 0,
     transform: `translateY(${sliderPosition < 90 ? 0 : -10}px)`
   };
 
-  const loadingOverlayStyles = {
+  const loadingOverlayStyles: CSSProperties = {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -223,7 +234,7 @@ const BeforeAfterSlider = ({
     zIndex: 5
   };
 
-  const spinnerStyles = {
+  const spinnerStyles: CSSProperties = {
     width: '40px',
     height: '40px',
     border: '3px solid #e9ecef',

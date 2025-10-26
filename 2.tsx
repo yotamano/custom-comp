@@ -1,12 +1,19 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, CSSProperties } from 'react';
 
-const ParallaxPhotoCarousel = () => {
+interface Photo {
+  id: number;
+  url: string;
+  title: string;
+  description: string;
+}
+
+const ParallaxPhotoCarousel: React.FC = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0.5, y: 0.5 });
-  const carouselRef = useRef(null);
+  const carouselRef = useRef<HTMLDivElement>(null);
 
-  const photos = [
+  const photos: Photo[] = [
     {
       id: 1,
       url: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&h=800&fit=crop&crop=entropy',
@@ -55,7 +62,7 @@ const ParallaxPhotoCarousel = () => {
     }
   };
 
-  const goToSlide = (index) => {
+  const goToSlide = (index: number) => {
     if (!isTransitioning && index !== currentIndex) {
       setIsTransitioning(true);
       setCurrentIndex(index);
@@ -63,7 +70,7 @@ const ParallaxPhotoCarousel = () => {
     }
   };
 
-  const handleMouseMove = (e) => {
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (carouselRef.current) {
       const rect = carouselRef.current.getBoundingClientRect();
       const x = (e.clientX - rect.left) / rect.width;
@@ -77,7 +84,7 @@ const ParallaxPhotoCarousel = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const getSlideStyle = (index, relativeIndex) => {
+  const getSlideStyle = (_index: number, relativeIndex: number): CSSProperties => {
     const distance = Math.abs(relativeIndex);
     const direction = relativeIndex > 0 ? 1 : -1;
     
@@ -96,6 +103,19 @@ const ParallaxPhotoCarousel = () => {
       zIndex,
       filter: distance > 0 ? `blur(${Math.min(distance * 2, 8)}px) brightness(${1 - distance * 0.2})` : 'none'
     };
+  };
+
+  const handleNavButtonHover = (e: React.MouseEvent<HTMLButtonElement>, isHovering: boolean) => {
+    const target = e.currentTarget;
+    target.style.background = isHovering ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)';
+    target.style.transform = isHovering ? 'translateY(-50%) scale(1.1)' : 'translateY(-50%) scale(1)';
+  };
+
+  const handleIndicatorHover = (e: React.MouseEvent<HTMLButtonElement>, isHovering: boolean, isActive: boolean) => {
+    if (!isActive) {
+      const target = e.currentTarget;
+      target.style.background = isHovering ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.3)';
+    }
   };
 
   return (
@@ -276,14 +296,8 @@ const ParallaxPhotoCarousel = () => {
           opacity: isTransitioning ? 0.5 : 1,
           zIndex: 100
         }}
-        onMouseEnter={(e) => {
-          e.target.style.background = 'rgba(255, 255, 255, 0.2)';
-          e.target.style.transform = 'translateY(-50%) scale(1.1)';
-        }}
-        onMouseLeave={(e) => {
-          e.target.style.background = 'rgba(255, 255, 255, 0.1)';
-          e.target.style.transform = 'translateY(-50%) scale(1)';
-        }}
+        onMouseEnter={(e) => handleNavButtonHover(e, true)}
+        onMouseLeave={(e) => handleNavButtonHover(e, false)}
       >
         ‹
       </button>
@@ -314,14 +328,8 @@ const ParallaxPhotoCarousel = () => {
           opacity: isTransitioning ? 0.5 : 1,
           zIndex: 100
         }}
-        onMouseEnter={(e) => {
-          e.target.style.background = 'rgba(255, 255, 255, 0.2)';
-          e.target.style.transform = 'translateY(-50%) scale(1.1)';
-        }}
-        onMouseLeave={(e) => {
-          e.target.style.background = 'rgba(255, 255, 255, 0.1)';
-          e.target.style.transform = 'translateY(-50%) scale(1)';
-        }}
+        onMouseEnter={(e) => handleNavButtonHover(e, true)}
+        onMouseLeave={(e) => handleNavButtonHover(e, false)}
       >
         ›
       </button>
@@ -355,16 +363,8 @@ const ParallaxPhotoCarousel = () => {
               backdropFilter: 'blur(10px)',
               opacity: isTransitioning ? 0.5 : 1
             }}
-            onMouseEnter={(e) => {
-              if (currentIndex !== index) {
-                e.target.style.background = 'rgba(255, 255, 255, 0.6)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (currentIndex !== index) {
-                e.target.style.background = 'rgba(255, 255, 255, 0.3)';
-              }
-            }}
+            onMouseEnter={(e) => handleIndicatorHover(e, true, currentIndex === index)}
+            onMouseLeave={(e) => handleIndicatorHover(e, false, currentIndex === index)}
           />
         ))}
       </div>
