@@ -6,8 +6,9 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const PROMPT_DIR = path.join(__dirname, 'ACTUAL_PROMPTS_v2');
+const PROMPT_DIR = path.join(__dirname, 'ACTUAL_PROMPTS_V5.1');
 const CONFIG_FILE = path.join(PROMPT_DIR, 'system-prompt-config.yaml');
+const OUTPUT_FILE = path.join(__dirname, 'full_prompt.txt');
 
 function readFile(filePath) {
   const absolutePath = path.join(PROMPT_DIR, filePath);
@@ -60,4 +61,5 @@ function constructSystemPrompt() {
 }
 
 const finalPrompt = constructSystemPrompt();
-console.log(finalPrompt);
+fs.writeFileSync(OUTPUT_FILE, finalPrompt);
+console.log(`Prompt successfully written to ${OUTPUT_FILE}`);

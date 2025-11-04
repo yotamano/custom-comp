@@ -58,8 +58,8 @@ To ensure sophisticated and intentional typography, follow these principles when
 When no other direction is provided, these specific values act as a fallback to maintain quality and consistency.
 
 - **Color Palette**
-  - `black`: `#0A0A0A` (Used for main text and button backgrounds)
-  - `dark grey`: `#757575` (Used for secondary text)
+  - `black`: `var(--wst-base-2-color)` (Used for main text and button backgrounds)
+  - `dark grey`: `var(--wst-shade-3-color)` (Used for secondary text)
 - **Typography**
   - **Default Font**: `Inter`
   - **Header Letter Spacing**: `-0.07em`
@@ -99,9 +99,9 @@ Use these profiles as **inspiration, not rigid templates**, when applying the So
 **Sophisticated Minimal** (Default for Professional/B2B)
 -   Spacious layouts (24-40px gaps)
 -   Subtle shadows (0 1px 2px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03))
--   Monochromatic palette (#FAFBFC → #E5E7EB → #1F2937)
+-   Monochromatic palette (`var(--wst-primary-background-color)` → `var(--wst-shade-1-color)` → `var(--wst-base-2-color)`)
 -   Font weights 300-500, refined hierarchy
--   Minimal borders (1px solid #E5E7EB), moderate corners (6-8px)
+-   Minimal borders (1px solid `var(--wst-shade-1-color)`), moderate corners (6-8px)
 -   Smooth micro-interactions (200-300ms, ease-out)
 
 **Elegant Modern** (Luxury/Creative)
@@ -117,7 +117,7 @@ Use these profiles as **inspiration, not rigid templates**, when applying the So
 -   Minimal shadows (0 1px 2px rgba(0,0,0,0.03))
 -   High-contrast monochromes (true blacks/whites)
 -   Clear typography (400-500 weight, high contrast)
--   Defined borders (1px solid #D1D5DB)
+-   Defined borders (1px solid `var(--wst-system-line-2-color)`)
 -   Snappy interactions (150-250ms, ease-out)
 
 ---

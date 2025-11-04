@@ -1,4 +1,4 @@
-import React, { useState, lazy, Suspense, useEffect, CSSProperties } from 'react';
+import React, { useState, lazy, Suspense, useEffect, CSSProperties, useRef } from 'react';
 import Editor from 'react-simple-code-editor';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-clike';
@@ -9,6 +9,41 @@ import { transform } from '@babel/standalone';
 import type { TransformOptions } from '@babel/core';
 
 import ResizableSlider from './ResizableSlider';
+
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
+    constructor(props: { children: React.ReactNode }) {
+      super(props);
+      this.state = { hasError: false, error: null };
+    }
+  
+    static getDerivedStateFromError(error: Error) {
+      return { hasError: true, error };
+    }
+  
+    componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+      console.error("Uncaught error in component:", error, errorInfo);
+    }
+  
+    render() {
+      if (this.state.hasError) {
+        return (
+          <div style={{ padding: '1rem', background: '#fffbe6', border: '1px solid #fde047', color: '#713f12', borderRadius: '8px', height: '100%', overflow: 'auto' }}>
+            <h2 style={{marginTop: 0}}>Component Error</h2>
+            <p>The component encountered a runtime error during rendering. This often indicates the generated React code is not robust enough to handle missing or empty props (e.g., an empty array of items), which is a violation of the prompt guidelines.</p>
+            <details>
+              <summary style={{cursor: 'pointer', fontWeight: '500'}}>View Error Details</summary>
+              <pre style={{ whiteSpace: 'pre-wrap', background: '#fefce8', padding: '10px', borderRadius: '4px', fontFamily: 'monospace', maxHeight: '200px', overflowY: 'auto', border: '1px solid #fef9c3', marginTop: '10px' }}>
+                <strong>{this.state.error?.toString()}</strong>
+                {this.state.error?.stack}
+              </pre>
+            </details>
+          </div>
+        );
+      }
+  
+      return this.props.children;
+    }
+}
 
 const Component1 = lazy(() => import('../1'));
 const Component2 = lazy(() => import('../2'));
@@ -593,6 +628,17 @@ export default Gallery3D
         "dataType": "booleanValue",
         "displayName": "Auto Rotate",
         "defaultValue": false
+      },
+      "navItems": {
+        "displayName": "Navigation Items",
+        "dataType": "arrayItems",
+        "arrayItems": {
+          "dataItem": {
+            "dataType": "text",
+            "displayName": "Navigation Text"
+          }
+        },
+        "defaultValue": "[]"
       }
     },
     "cssProperties": {
@@ -774,7 +820,12 @@ const compileCode = (code: string): CompiledResult => {
     const exports: { default?: React.ComponentType } = {};
     const require = (name: string) => {
       if (name === 'react') return React;
-      throw new Error(`Cannot find module '${name}'`);
+      if (name.includes('defaultImages')) {
+        console.warn(`Mocking missing module '${name}' with an empty array.`);
+        return [];
+      }
+      console.warn(`Mocking missing module '${name}' with an empty object.`);
+      return {};
     };
     
     // eslint-disable-next-line no-new-func
@@ -893,12 +944,1629 @@ const parseCSV = (text: string): CSVResult[] => {
   return results;
 };
 
+const getValueByPath = (obj: any, path: string[]) => {
+  return path.reduce((acc, key) => (acc && acc[key] !== 'undefined' ? acc[key] : undefined), obj);
+};
+
+// Pool of diverse, realistic placeholder images
+const PLACEHOLDER_IMAGES = [
+  {
+    uri: 'wix:image://v1/placeholder1.jpg',
+    url: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop',
+    name: 'Mountain Lake Landscape',
+    width: 800,
+    height: 600,
+  },
+  {
+    uri: 'wix:image://v1/placeholder2.jpg',
+    url: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800&h=600&fit=crop',
+    name: 'Forest Trail Path',
+    width: 800,
+    height: 600,
+  },
+  {
+    uri: 'wix:image://v1/placeholder3.jpg',
+    url: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&h=600&fit=crop',
+    name: 'Desert Sand Dunes',
+    width: 800,
+    height: 600,
+  },
+  {
+    uri: 'wix:image://v1/placeholder4.jpg',
+    url: 'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=800&h=600&fit=crop',
+    name: 'Ocean Waves Beach',
+    width: 800,
+    height: 600,
+  },
+  {
+    uri: 'wix:image://v1/placeholder5.jpg',
+    url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&h=600&fit=crop',
+    name: 'Mountain Peak Snow',
+    width: 800,
+    height: 600,
+  },
+  {
+    uri: 'wix:image://v1/placeholder6.jpg',
+    url: 'https://images.unsplash.com/photo-1418065460487-3e41a6c84dc5?w=800&h=600&fit=crop',
+    name: 'Autumn Forest Colors',
+    width: 800,
+    height: 600,
+  },
+  {
+    uri: 'wix:image://v1/placeholder7.jpg',
+    url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&h=600&fit=crop',
+    name: 'Portrait Photography',
+    width: 800,
+    height: 600,
+  },
+  {
+    uri: 'wix:image://v1/placeholder8.jpg',
+    url: 'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?w=800&h=600&fit=crop',
+    name: 'City Architecture Night',
+    width: 800,
+    height: 600,
+  },
+];
+
+let imageCounter = 0;
+
+const getNextPlaceholderImage = () => {
+  const image = PLACEHOLDER_IMAGES[imageCounter % PLACEHOLDER_IMAGES.length];
+  imageCounter++;
+  return { ...image };
+};
+
+const createDefaultItemFromSchema = (schema: any, itemIndex: number = 0): any => {
+    if (!schema) return null;
+
+    switch(schema.dataType) {
+        case 'image': 
+            return getNextPlaceholderImage();
+        case 'objectValue':
+            const obj: any = {};
+            if (schema.properties) {
+                for (const key in schema.properties) {
+                    obj[key] = createDefaultItemFromSchema(schema.properties[key], itemIndex);
+                }
+            }
+            return obj;
+        case 'booleanValue': return false;
+        case 'number': return itemIndex + 1;
+        case 'text': case 'stringValue': return itemIndex > 0 ? `Item ${itemIndex + 1}` : 'Sample Text';
+        default: return null;
+    }
+};
+
+const createDefaultValue = (schema: any): any => {
+    if (schema.dataType === 'arrayItems') {
+        let defaultValue = [];
+        if (schema.defaultValue) {
+            if (typeof schema.defaultValue === 'string') {
+                try {
+                    const parsed = JSON.parse(schema.defaultValue);
+                    if (Array.isArray(parsed)) {
+                        defaultValue = parsed;
+                    }
+                } catch (e) { /* invalid json, default to empty array */ }
+            } else if (Array.isArray(schema.defaultValue)) {
+                defaultValue = schema.defaultValue;
+            }
+        }
+
+        if (defaultValue.length === 0) {
+            // Handle simple dataItem structure
+            if (schema.arrayItems?.dataItem) {
+                const defaultItem = createDefaultItemFromSchema(schema.arrayItems.dataItem, 0);
+                if (defaultItem) {
+                    // Create multiple items for galleries (3-5 items)
+                    const hasImageData = JSON.stringify(schema.arrayItems.dataItem).includes('image');
+                    const itemCount = hasImageData ? 5 : 3;
+                    
+                    return Array.from({ length: itemCount }, (_, i) => 
+                        createDefaultItemFromSchema(schema.arrayItems.dataItem, i)
+                    );
+                }
+            }
+            // Handle complex data.items structure (nested objects)
+            else if (schema.arrayItems?.data?.items) {
+                const items = schema.arrayItems.data.items;
+                const hasImageData = JSON.stringify(items).includes('image');
+                const itemCount = hasImageData ? 5 : 3;
+                
+                return Array.from({ length: itemCount }, (_, i) => {
+                    const item: any = {};
+                    Object.entries(items).forEach(([key, itemSchema]: [string, any]) => {
+                        item[key] = createDefaultItemFromSchema(itemSchema, i);
+                    });
+                    return item;
+                });
+            }
+        }
+        return defaultValue;
+    }
+
+    if (schema.defaultValue !== undefined) {
+        if (schema.dataType === 'objectValue' && typeof schema.defaultValue === 'string') {
+            try {
+                return JSON.parse(schema.defaultValue);
+            } catch(e) {
+                // Not a valid JSON string, fall through to return as string
+            }
+        }
+        return schema.defaultValue;
+    }
+
+    switch(schema.dataType) {
+        case 'objectValue':
+            const obj: any = {};
+            if (schema.properties) {
+                Object.keys(schema.properties).forEach(key => {
+                    obj[key] = createDefaultValue(schema.properties[key]);
+                });
+            }
+            return obj;
+        case 'booleanValue': return false;
+        case 'number': return 0;
+        case 'text':
+        case 'stringValue': return '';
+        case 'image': return getNextPlaceholderImage();
+        default: return null;
+    }
+};
+
+const buildInitialState = (node: any): any => {
+    let state: any = {};
+    if (node.data) {
+        Object.entries(node.data).forEach(([key, value]: [string, any]) => {
+            state[key] = createDefaultValue(value);
+        });
+    }
+    if (node.elements) {
+        state.elementProps = {};
+        Object.entries(node.elements).forEach(([key, value]: [string, any]) => {
+            state.elementProps[key] = buildInitialState(value.inlineElement);
+        });
+    }
+    return state;
+};
+
+const buildInitialCssState = (node: any): any => {
+    let cssState: any = {};
+    if (node.cssProperties) {
+        cssState.properties = {};
+        Object.entries(node.cssProperties).forEach(([key, value]: [string, any]) => {
+            cssState.properties[key] = value.defaultValue;
+        });
+    }
+    if (node.elements) {
+        cssState.elements = {};
+        Object.entries(node.elements).forEach(([key, value]: [string, any]) => {
+            cssState.elements[key] = buildInitialCssState(value.inlineElement);
+        });
+    }
+    return cssState;
+}
+
+const buildSelectorMap = (node: any, path: string[], map: { [key: string]: string[] }) => {
+    if (node.selector) {
+        map[node.selector] = path;
+    }
+    if (node.elements) {
+        Object.entries(node.elements).forEach(([key, value]: [string, any]) => {
+            buildSelectorMap(value.inlineElement, [...path, 'elements', key], map);
+        });
+    }
+};
+
+const getNodeByPath = (rootNode: any, path: string[]) => {
+  let currentNode = rootNode;
+  for (const key of path) {
+    if (currentNode && typeof currentNode === 'object' && key in currentNode) {
+      currentNode = currentNode[key];
+    } else {
+      return null; // Path is invalid
+    }
+  }
+  return currentNode;
+};
+
+const isNumeric = (val: any): val is number | string => !isNaN(parseFloat(val)) && isFinite(val);
+
+const parseUnitValue = (value: string | number): { value: number, unit: string } => {
+    if (typeof value === 'number') return { value, unit: '' };
+    if (typeof value !== 'string') return { value: 0, unit: 'px' };
+    const match = value.match(/^(-?\d+\.?\d*)\s*(px|%|em|rem|vw|vh|s|deg)?$/i);
+    if (match) return { value: parseFloat(match[1]), unit: match[2] || '' };
+    return { value: parseFloat(value) || 0, unit: '' };
+};
+
+const sizeUnits = ['px', '%', 'em', 'rem'];
+const isSizeProperty = (propName: string) => {
+    const lowerPropName = propName.toLowerCase();
+    const sizeKeywords = ['width', 'height', 'padding', 'margin', 'radius', 'font-size', 'gap', 'top', 'left', 'right', 'bottom'];
+    return sizeKeywords.some(keyword => lowerPropName.includes(keyword));
+};
+
+const UnitInput: React.FC<{
+    value: string;
+    onChange: (newValue: string) => void;
+}> = ({ value, onChange }) => {
+    const { value: numValue, unit: currentUnit } = parseUnitValue(value);
+
+    const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        onChange(`${e.target.value}${currentUnit}`);
+    };
+
+    const handleUnitChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        onChange(`${numValue}${e.target.value}`);
+    };
+
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', width: '120px' }}>
+            <input
+                type="number"
+                value={numValue}
+                onChange={handleValueChange}
+                style={{ 
+                    padding: '4px 8px', 
+                    borderRadius: '4px 0 0 4px', 
+                    border: '1px solid rgba(0, 0, 0, 0.08)', 
+                    width: '70%', 
+                    fontSize: '11px', 
+                    borderRight: 'none',
+                    background: '#ffffff',
+                    color: '#09090b',
+                    transition: 'border-color 0.15s ease',
+                }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.2)'; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
+            />
+            <select 
+                value={currentUnit} 
+                onChange={handleUnitChange} 
+                style={{ 
+                    padding: '4px 2px', 
+                    borderRadius: '0 4px 4px 0', 
+                    border: '1px solid rgba(0, 0, 0, 0.08)', 
+                    width: '30%', 
+                    fontSize: '11px', 
+                    background: '#fafafa',
+                    color: '#09090b',
+                    cursor: 'pointer',
+                    transition: 'border-color 0.15s ease',
+                }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.2)'; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
+            >
+                {sizeUnits.map(u => <option key={u} value={u}>{u}</option>)}
+            </select>
+        </div>
+    );
+};
+
+const SizeInputWithSlider: React.FC<{
+    value: string;
+    onChange: (newValue: string) => void;
+}> = ({ value, onChange }) => {
+    const { value: numValue, unit: currentUnit } = parseUnitValue(value);
+    
+    // Determine min/max based on property type (you can customize these)
+    const min = 0;
+    const max = currentUnit === 'px' ? 500 : currentUnit === '%' ? 100 : currentUnit === 'rem' ? 10 : 100;
+    
+    const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newNumValue = parseFloat(e.target.value);
+        onChange(`${newNumValue}${currentUnit}`);
+    };
+
+    const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        onChange(`${e.target.value}${currentUnit}`);
+    };
+
+    const handleUnitChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        onChange(`${numValue}${e.target.value}`);
+    };
+
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%' }}>
+            <input
+                type="range"
+                min={min}
+                max={max}
+                step={currentUnit === 'px' ? 1 : currentUnit === 'rem' ? 0.1 : 1}
+                value={numValue}
+                onChange={handleSliderChange}
+                style={{ 
+                    flex: 1,
+                    height: '4px',
+                    borderRadius: '2px',
+                    background: '#f4f4f5',
+                    outline: 'none',
+                    cursor: 'pointer',
+                    minWidth: '50px',
+                    maxWidth: '70px',
+                }}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', width: '100px', flexShrink: 0 }}>
+                <input
+                    type="number"
+                    value={numValue}
+                    onChange={handleValueChange}
+                    style={{ 
+                        padding: '4px 6px', 
+                        borderRadius: '4px 0 0 4px', 
+                        border: '1px solid rgba(0, 0, 0, 0.08)', 
+                        width: '65%', 
+                        fontSize: '10px', 
+                        borderRight: 'none',
+                        background: '#ffffff',
+                        color: '#09090b',
+                        transition: 'border-color 0.15s ease',
+                    }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.2)'; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
+                />
+                <select 
+                    value={currentUnit} 
+                    onChange={handleUnitChange} 
+                    style={{ 
+                        padding: '4px 2px', 
+                        borderRadius: '0 4px 4px 0', 
+                        border: '1px solid rgba(0, 0, 0, 0.08)', 
+                        width: '35%', 
+                        fontSize: '10px', 
+                        background: '#fafafa',
+                        color: '#09090b',
+                        cursor: 'pointer',
+                        transition: 'border-color 0.15s ease',
+                    }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.2)'; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
+                >
+                    {sizeUnits.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+            </div>
+        </div>
+    );
+};
+
+const SliderInput: React.FC<{
+    value: number | string;
+    onChange: (newValue: number | string) => void;
+    min?: number;
+    max?: number;
+    step?: number;
+}> = ({ value, onChange, min = 0, max = 100, step = 1 }) => {
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        onChange(e.target.type === 'range' ? parseFloat(e.target.value) : e.target.value);
+    }
+
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '110px' }}>
+            <input
+                type="range"
+                min={min}
+                max={max}
+                step={step}
+                value={numValue}
+                onChange={handleChange}
+                style={{ 
+                    flex: 1, 
+                    marginRight: '8px',
+                    height: '4px',
+                    borderRadius: '2px',
+                    background: '#f4f4f5',
+                    outline: 'none',
+                    cursor: 'pointer',
+                }}
+            />
+            <input
+                type="number"
+                min={min}
+                max={max}
+                step={step}
+                value={numValue}
+                onChange={handleChange}
+                style={{ 
+                    width: '50px', 
+                    padding: '4px', 
+                    borderRadius: '4px', 
+                    border: '1px solid rgba(0, 0, 0, 0.08)', 
+                    fontSize: '11px',
+                    background: '#ffffff',
+                    color: '#09090b',
+                    transition: 'border-color 0.15s ease',
+                }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.2)'; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
+            />
+        </div>
+    );
+};
+
+const ManifestNode: React.FC<{
+  node: any;
+  nodeKey: string;
+  path: string;
+  propPath: string[];
+  cssPath: string[];
+  props: any;
+  onPropChange: (path: string[], value: any) => void;
+  cssProps: any;
+  onCssChange: (path: string[], prop: string, value: any) => void;
+  collapsedNodes: { [key: string]: boolean };
+  onToggleNode: (path: string) => void;
+}> = ({ 
+  node, nodeKey, path, propPath, cssPath, props, onPropChange, cssProps, onCssChange, collapsedNodes, onToggleNode 
+}) => {
+  if (!node) return null;
+
+  const isCollapsed = collapsedNodes[path];
+  const displayName = node.displayName || nodeKey;
+
+  const hasContent = node.data || node.cssProperties || node.elements;
+
+  return (
+    <div style={{ marginLeft: path.split('.').length > 1 ? '8px' : '0', borderLeft: path.split('.').length > 1 ? '1px solid rgba(0, 0, 0, 0.06)' : 'none', paddingLeft: path.split('.').length > 1 ? '12px' : '0', marginTop: '8px' }}>
+      <div 
+        onClick={() => hasContent && onToggleNode(path)} 
+        style={{ cursor: hasContent ? 'pointer' : 'default', display: 'flex', alignItems: 'center', padding: '4px 0' }}
+        onMouseEnter={(e) => { if (hasContent) e.currentTarget.style.backgroundColor = '#fafafa'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+      >
+        {hasContent && <span style={{ marginRight: '6px', width: '10px', fontSize: '10px', color: '#71717a' }}>{isCollapsed ? '▸' : '▾'}</span>}
+        <p style={{ margin: '0', fontWeight: '500', color: '#09090b', fontSize: '12px', letterSpacing: '-0.01em' }}>{displayName}</p>
+      </div>
+      
+      {!isCollapsed && hasContent && (
+        <div style={{ paddingTop: '8px' }}>
+          {node.data && (
+            <div style={{ paddingLeft: '8px' }}>
+              <h4 style={{ margin: '0 0 8px', fontSize: '10px', color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '600' }}>Data</h4>
+              {Object.entries(node.data).map(([propName, propValue]: [string, any]) => {
+                const currentPath = [...propPath, propName];
+                const currentValue = getValueByPath(props, currentPath.slice(1));
+
+                return (
+                  <div key={propName} style={{ marginBottom: '6px', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <label style={{ color: '#71717a', marginRight: '10px', fontSize: '11px' }}>{propValue.displayName || propName}: </label>
+                    {propValue.dataType === 'booleanValue' ? (
+                      <Toggle
+                        checked={!!currentValue}
+                        onChange={(checked) => onPropChange(currentPath.slice(1), checked)}
+                      />
+                    ) : propValue.dataType === 'arrayItems' ? (
+                      <ArrayEditor
+                        value={Array.isArray(currentValue) ? currentValue : []}
+                        onChange={(newValue) => onPropChange(currentPath.slice(1), newValue)}
+                        schema={propValue}
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        value={currentValue || ''}
+                        onChange={(e) => onPropChange(currentPath.slice(1), e.target.value)}
+                        style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid rgba(0, 0, 0, 0.08)', width: '120px', fontSize: '11px', background: '#ffffff', transition: 'border-color 0.15s ease' }}
+                        onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.2)'; }}
+                        onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {node.cssProperties && (
+            <div style={{ paddingLeft: '8px', marginTop: '12px' }}>
+              <h4 style={{ margin: '0 0 8px', fontSize: '10px', color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '600' }}>CSS Properties</h4>
+              {Object.entries(node.cssProperties).map(([propName, propValue]: [string, any]) => {
+                const currentCssNode = cssPath.slice(1).reduce((acc, curr) => acc && acc[curr] ? acc[curr] : null, cssProps);
+                const currentValue = currentCssNode?.properties?.[propName] ?? propValue.defaultValue;
+                
+                return (
+                  <div key={propName} style={{ marginBottom: '6px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <label style={{ color: '#71717a', fontSize: '11px', flex: 1, minWidth: 0 }}>{propValue.displayName || propName}: </label>
+                    <div style={{ width: '180px', flexShrink: 0, display: 'flex', justifyContent: 'flex-end' }}>
+                      {(isColorProperty(propName, currentValue) || isCSSVariable(currentValue || '')) && propName.toLowerCase().includes('color') ? (
+                        <VariablePicker
+                          value={currentValue || ''}
+                          onChange={(newValue) => onCssChange(cssPath.slice(1), propName, newValue)}
+                          type="color"
+                          propName={propName}
+                        />
+                      ) : (propName.toLowerCase().includes('font') || propName.toLowerCase().includes('family') || propName.toLowerCase().includes('typography') || isCSSVariable(currentValue || '')) && !propName.toLowerCase().includes('color') ? (
+                        <VariablePicker
+                          value={currentValue || ''}
+                          onChange={(newValue) => onCssChange(cssPath.slice(1), propName, newValue)}
+                          type="text"
+                          propName={propName}
+                        />
+                      ) : isSizeProperty(propName) ? (
+                          <SizeInputWithSlider value={currentValue} onChange={newValue => onCssChange(cssPath.slice(1), propName, newValue)} />
+                      ) : isNumericProperty(propName, currentValue) ? (
+                          <SliderInput 
+                            value={currentValue} 
+                            onChange={newValue => onCssChange(cssPath.slice(1), propName, newValue)} 
+                            min={propName.toLowerCase().includes('opacity') ? 0 : 0}
+                            max={propName.toLowerCase().includes('opacity') ? 1 : 100}
+                            step={propName.toLowerCase().includes('opacity') ? 0.01 : 1}
+                          />
+                      ) : getCSSPropertyOptions(propName) ? (
+                        <CSSPropertyDropdown
+                          value={currentValue || ''}
+                          onChange={(newValue) => onCssChange(cssPath.slice(1), propName, newValue)}
+                          propName={propName}
+                          options={getCSSPropertyOptions(propName) || []}
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          value={currentValue ?? ''}
+                          onChange={(e) => onCssChange(cssPath.slice(1), propName, e.target.value)}
+                          style={{ padding: '4px 6px', borderRadius: '4px', border: '1px solid rgba(0, 0, 0, 0.08)', width: '110px', fontSize: '10px', background: '#ffffff', transition: 'border-color 0.15s ease' }}
+                          onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.2)'; }}
+                          onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {node.elements && (
+            <div style={{ paddingLeft: '0px', marginTop: '12px' }}>
+              <h4 style={{ margin: '0 0 8px 8px', fontSize: '10px', color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '600' }}>Elements</h4>
+              {Object.entries(node.elements).map(([elementName, elementValue]: [string, any]) => {
+                const nextPropPath = [...propPath, 'elementProps', elementName];
+                const nextCssPath = [...cssPath, 'elements', elementName];
+                const nextPath = `${path}.${elementName}`;
+                return (
+                  <ManifestNode
+                    key={elementName}
+                    node={elementValue.inlineElement}
+                    nodeKey={elementName}
+                    path={nextPath}
+                    propPath={nextPropPath}
+                    cssPath={nextCssPath}
+                    props={props}
+                    onPropChange={onPropChange}
+                    cssProps={cssProps}
+                    onCssChange={onCssChange}
+                    collapsedNodes={collapsedNodes}
+                    onToggleNode={onToggleNode}
+                  />
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const Toggle: React.FC<{
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}> = ({ checked, onChange }) => {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      style={{
+        position: 'relative',
+        width: '44px',
+        height: '24px',
+        borderRadius: '12px',
+        border: 'none',
+        background: checked ? '#09090b' : '#d4d4d8',
+        cursor: 'pointer',
+        transition: 'background-color 0.2s ease',
+        padding: 0,
+        outline: 'none',
+      }}
+      onMouseEnter={(e) => { if (!checked) e.currentTarget.style.background = '#e4e4e7'; }}
+      onMouseLeave={(e) => { if (!checked) e.currentTarget.style.background = '#d4d4d8'; }}
+    >
+      <span
+        style={{
+          position: 'absolute',
+          top: '2px',
+          left: checked ? '22px' : '2px',
+          width: '20px',
+          height: '20px',
+          borderRadius: '50%',
+          background: '#ffffff',
+          transition: 'left 0.2s ease',
+          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+        }}
+      />
+    </button>
+  );
+};
+
+const VariablePicker: React.FC<{
+  value: string;
+  onChange: (value: string) => void;
+  type: 'color' | 'text';
+  propName: string;
+}> = ({ value, onChange, type, propName }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [customValue, setCustomValue] = useState('');
+  const [mode, setMode] = useState<'variable' | 'custom'>('variable');
+  const variableName = extractVariableName(value);
+  const isVariable = isCSSVariable(value);
+  const computedValue = variableName ? getComputedCSSValue(variableName) : '';
+  
+  const variables = type === 'color' ? getColorVariables() : getTextVariables();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && popoverRef.current && containerRef.current) {
+      const popover = popoverRef.current;
+      const container = containerRef.current;
+      const rect = container.getBoundingClientRect();
+      const popoverWidth = 280;
+      const viewportWidth = window.innerWidth;
+      
+      // Check if popover would overflow to the right
+      if (rect.left + popoverWidth > viewportWidth - 16) {
+        // Position to the left instead
+        popover.style.left = 'auto';
+        popover.style.right = '0';
+      } else {
+        popover.style.left = '0';
+        popover.style.right = 'auto';
+      }
+    }
+  }, [isOpen]);
+
+  const handleDetach = () => {
+    if (isVariable && computedValue) {
+      onChange(computedValue);
+    }
+    setIsOpen(false);
+  };
+
+  const handleSelectVariable = (varName: string) => {
+    onChange(`var(${varName})`);
+    setIsOpen(false);
+    setMode('variable');
+  };
+
+  const handleSetCustom = () => {
+    if (customValue.trim()) {
+      onChange(customValue.trim());
+      setIsOpen(false);
+      setCustomValue('');
+    }
+  };
+
+  // Get display value for preview
+  const getDisplayValue = () => {
+    if (isVariable) {
+      return computedValue || variableName || '';
+    }
+    return value || '';
+  };
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', width: '120px' }}>
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          padding: '4px 6px',
+          borderRadius: '4px',
+          border: '1px solid rgba(0, 0, 0, 0.08)',
+          background: '#ffffff',
+          cursor: 'pointer',
+          fontSize: '11px',
+          transition: 'border-color 0.15s ease',
+          width: '100%',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.12)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
+      >
+        {type === 'color' && (
+          <div
+            style={{
+              width: '14px',
+              height: '14px',
+              borderRadius: '3px',
+              background: isVariable && computedValue ? computedValue : (value || '#ffffff'),
+              border: '1px solid rgba(0, 0, 0, 0.1)',
+              flexShrink: 0,
+            }}
+          />
+        )}
+        {type === 'text' && isVariable && (
+          <div
+            style={{
+              width: '14px',
+              height: '14px',
+              borderRadius: '3px',
+              background: '#fafafa',
+              border: '1px solid rgba(0, 0, 0, 0.1)',
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '7px',
+              color: '#71717a',
+              font: variableName ? `var(${variableName})` : 'inherit',
+            }}
+          >
+            Aa
+          </div>
+        )}
+        {isVariable && (
+          <span style={{ fontSize: '9px', color: '#2563eb', flexShrink: 0 }}>🔗</span>
+        )}
+        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '10px', minWidth: 0 }}>
+          {isVariable ? (variableName?.length > 12 ? variableName.substring(0, 10) + '...' : variableName) : (value || 'Custom')}
+        </span>
+        <span style={{ fontSize: '8px', color: '#71717a', flexShrink: 0 }}>▾</span>
+      </div>
+      
+      {isOpen && (
+        <div
+          ref={popoverRef}
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            marginTop: '4px',
+            width: '280px',
+            maxHeight: '300px',
+            background: '#ffffff',
+            border: '1px solid rgba(0, 0, 0, 0.08)',
+            borderRadius: '6px',
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12)',
+            zIndex: 1000,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {isVariable && (
+            <div style={{ padding: '8px 12px', borderBottom: '1px solid rgba(0, 0, 0, 0.06)', background: '#fafafa' }}>
+              <div style={{ fontSize: '10px', color: '#71717a', marginBottom: '4px' }}>Connected to:</div>
+              <div style={{ fontSize: '11px', fontWeight: '600', color: '#09090b', marginBottom: '4px' }}>{variableName}</div>
+              {computedValue && (
+                <div style={{ fontSize: '10px', color: '#71717a', marginBottom: '8px' }}>
+                  Value: {computedValue}
+                </div>
+              )}
+              <button
+                onClick={handleDetach}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: '10px',
+                  background: '#ffffff',
+                  border: '1px solid rgba(0, 0, 0, 0.08)',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  width: '100%',
+                }}
+              >
+                Detach Variable
+              </button>
+            </div>
+          )}
+          
+          <div style={{ display: 'flex', borderBottom: '1px solid rgba(0, 0, 0, 0.06)' }}>
+            <button
+              onClick={() => setMode('variable')}
+              style={{
+                flex: 1,
+                padding: '6px',
+                fontSize: '10px',
+                background: mode === 'variable' ? '#fafafa' : 'transparent',
+                border: 'none',
+                borderBottom: mode === 'variable' ? '2px solid #09090b' : '2px solid transparent',
+                cursor: 'pointer',
+                fontWeight: mode === 'variable' ? '600' : '400',
+              }}
+            >
+              Variables
+            </button>
+            <button
+              onClick={() => setMode('custom')}
+              style={{
+                flex: 1,
+                padding: '6px',
+                fontSize: '10px',
+                background: mode === 'custom' ? '#fafafa' : 'transparent',
+                border: 'none',
+                borderBottom: mode === 'custom' ? '2px solid #09090b' : '2px solid transparent',
+                cursor: 'pointer',
+                fontWeight: mode === 'custom' ? '600' : '400',
+              }}
+            >
+              Custom
+            </button>
+          </div>
+          
+          {mode === 'variable' ? (
+            <div style={{ overflowY: 'auto', maxHeight: '200px', padding: '4px' }}>
+              {variables.map((varName) => (
+                <div
+                  key={varName}
+                  onClick={() => handleSelectVariable(varName)}
+                  style={{
+                    padding: '6px 8px',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    borderRadius: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#fafafa'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  {type === 'color' && (
+                    <div
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '3px',
+                        background: `var(${varName})`,
+                        border: '1px solid rgba(0, 0, 0, 0.1)',
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
+                  {type === 'text' && (
+                    <div
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '3px',
+                        background: '#fafafa',
+                        border: '1px solid rgba(0, 0, 0, 0.1)',
+                        flexShrink: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '8px',
+                        color: '#71717a',
+                        font: `var(${varName})`,
+                      }}
+                    >
+                      Aa
+                    </div>
+                  )}
+                  <span style={{ flex: 1 }}>{varName}</span>
+                  {varName === variableName && (
+                    <span style={{ fontSize: '10px', color: '#09090b' }}>✓</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ padding: '8px' }}>
+              <input
+                type={type === 'color' ? 'color' : 'text'}
+                value={customValue || (isVariable ? computedValue : value)}
+                onChange={(e) => setCustomValue(e.target.value)}
+                placeholder={type === 'color' ? '#000000' : 'Enter value'}
+                style={{
+                  width: '100%',
+                  padding: '6px 8px',
+                  fontSize: '11px',
+                  border: '1px solid rgba(0, 0, 0, 0.08)',
+                  borderRadius: '4px',
+                  marginBottom: '8px',
+                }}
+              />
+              <button
+                onClick={handleSetCustom}
+                style={{
+                  width: '100%',
+                  padding: '6px',
+                  fontSize: '11px',
+                  background: '#09090b',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                }}
+              >
+                Set Custom Value
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const CSSPropertyDropdown: React.FC<{
+  value: string;
+  onChange: (value: string) => void;
+  propName: string;
+  options: string[];
+}> = ({ value, onChange, options }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && popoverRef.current && containerRef.current) {
+      const popover = popoverRef.current;
+      const container = containerRef.current;
+      const rect = container.getBoundingClientRect();
+      const popoverWidth = 200;
+      const viewportWidth = window.innerWidth;
+      
+      // Check if popover would overflow to the right
+      if (rect.left + popoverWidth > viewportWidth - 16) {
+        // Position to the left instead
+        popover.style.left = 'auto';
+        popover.style.right = '0';
+      } else {
+        popover.style.left = '0';
+        popover.style.right = 'auto';
+      }
+    }
+  }, [isOpen]);
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', width: '120px' }}>
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          padding: '4px 6px',
+          borderRadius: '4px',
+          border: '1px solid rgba(0, 0, 0, 0.08)',
+          background: '#ffffff',
+          cursor: 'pointer',
+          fontSize: '10px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          transition: 'border-color 0.15s ease',
+          width: '100%',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.12)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
+      >
+        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {value || 'Select...'}
+        </span>
+        <span style={{ fontSize: '8px', color: '#71717a', marginLeft: '6px', flexShrink: 0 }}>▾</span>
+      </div>
+      
+      {isOpen && (
+        <div
+          ref={popoverRef}
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            marginTop: '4px',
+            width: '200px',
+            maxHeight: '250px',
+            background: '#ffffff',
+            border: '1px solid rgba(0, 0, 0, 0.08)',
+            borderRadius: '6px',
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12)',
+            zIndex: 1000,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{ overflowY: 'auto', maxHeight: '250px', padding: '4px' }}>
+            {options.map((option) => (
+              <div
+                key={option}
+                onClick={() => {
+                  onChange(option);
+                  setIsOpen(false);
+                }}
+                style={{
+                  padding: '6px 8px',
+                  fontSize: '11px',
+                  cursor: 'pointer',
+                  borderRadius: '4px',
+                  background: value === option ? '#fafafa' : 'transparent',
+                  color: value === option ? '#09090b' : '#71717a',
+                }}
+                onMouseEnter={(e) => { if (value !== option) e.currentTarget.style.background = '#fafafa'; }}
+                onMouseLeave={(e) => { if (value !== option) e.currentTarget.style.background = 'transparent'; }}
+              >
+                {option}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ArrayEditor: React.FC<{
+  value: any[];
+  onChange: (value: any[]) => void;
+  schema: any;
+}> = ({ value, onChange, schema }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+        setEditingIndex(null);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && popoverRef.current && containerRef.current) {
+      const popover = popoverRef.current;
+      const container = containerRef.current;
+      const rect = container.getBoundingClientRect();
+      const popoverWidth = 320;
+      const viewportWidth = window.innerWidth;
+      
+      // Check if popover would overflow to the right
+      if (rect.left + popoverWidth > viewportWidth - 16) {
+        // Position to the left instead
+        popover.style.left = 'auto';
+        popover.style.right = '0';
+      } else {
+        popover.style.left = '0';
+        popover.style.right = 'auto';
+      }
+    }
+  }, [isOpen]);
+
+  const handleAdd = () => {
+    const newItem = schema.arrayItems?.dataItem?.dataType === 'text' ? '' : {};
+    onChange([...value, newItem]);
+    setEditingIndex(value.length);
+    setEditValue('');
+  };
+
+  const handleEdit = (index: number, item: any) => {
+    setEditingIndex(index);
+    setEditValue(typeof item === 'string' ? item : JSON.stringify(item, null, 2));
+  };
+
+  const handleSave = (index: number) => {
+    const newArray = [...value];
+    try {
+      if (schema.arrayItems?.dataItem?.dataType === 'text') {
+        newArray[index] = editValue;
+      } else {
+        newArray[index] = JSON.parse(editValue);
+      }
+      onChange(newArray);
+    } catch (e) {
+      // Invalid JSON, keep as string
+      newArray[index] = editValue;
+      onChange(newArray);
+    }
+    setEditingIndex(null);
+    setEditValue('');
+  };
+
+  const handleRemove = (index: number) => {
+    onChange(value.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', width: '120px' }}>
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          padding: '4px 8px',
+          borderRadius: '4px',
+          border: '1px solid rgba(0, 0, 0, 0.08)',
+          background: '#ffffff',
+          cursor: 'pointer',
+          fontSize: '11px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <span>{value.length} item{value.length !== 1 ? 's' : ''}</span>
+        <span style={{ fontSize: '8px', color: '#71717a' }}>▾</span>
+      </div>
+      
+      {isOpen && (
+        <div
+          ref={popoverRef}
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            marginTop: '4px',
+            width: '320px',
+            maxHeight: '300px',
+            background: '#ffffff',
+            border: '1px solid rgba(0, 0, 0, 0.08)',
+            borderRadius: '6px',
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12)',
+            zIndex: 1000,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{ padding: '8px', borderBottom: '1px solid rgba(0, 0, 0, 0.06)', background: '#fafafa' }}>
+            <div style={{ fontSize: '10px', fontWeight: '600', color: '#09090b', marginBottom: '8px' }}>Array Items</div>
+            <button
+              onClick={handleAdd}
+              style={{
+                width: '100%',
+                padding: '6px',
+                fontSize: '11px',
+                background: '#09090b',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+              }}
+            >
+              + Add Item
+            </button>
+          </div>
+          
+          <div style={{ overflowY: 'auto', maxHeight: '200px', padding: '4px' }}>
+            {value.map((item, index) => (
+              <div
+                key={index}
+                style={{
+                  padding: '6px',
+                  marginBottom: '4px',
+                  borderRadius: '4px',
+                  border: '1px solid rgba(0, 0, 0, 0.06)',
+                  background: editingIndex === index ? '#fafafa' : '#ffffff',
+                }}
+              >
+                {editingIndex === index ? (
+                  <div>
+                    <textarea
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '4px',
+                        fontSize: '10px',
+                        border: '1px solid rgba(0, 0, 0, 0.08)',
+                        borderRadius: '4px',
+                        fontFamily: 'monospace',
+                        minHeight: '60px',
+                        marginBottom: '4px',
+                      }}
+                    />
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button
+                        onClick={() => handleSave(index)}
+                        style={{
+                          flex: 1,
+                          padding: '4px',
+                          fontSize: '10px',
+                          background: '#09090b',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => { setEditingIndex(null); setEditValue(''); }}
+                        style={{
+                          flex: 1,
+                          padding: '4px',
+                          fontSize: '10px',
+                          background: '#ffffff',
+                          color: '#71717a',
+                          border: '1px solid rgba(0, 0, 0, 0.08)',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div
+                      onClick={() => handleEdit(index, item)}
+                      style={{
+                        flex: 1,
+                        fontSize: '10px',
+                        color: '#71717a',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        borderRadius: '4px',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = '#fafafa'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      {typeof item === 'string' ? item : JSON.stringify(item)}
+                    </div>
+                    <button
+                      onClick={() => handleRemove(index)}
+                      style={{
+                        padding: '2px 6px',
+                        fontSize: '10px',
+                        background: 'transparent',
+                        color: '#ef4444',
+                        border: 'none',
+                        cursor: 'pointer',
+                        borderRadius: '4px',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = '#fef2f2'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const isColorProperty = (propName: string, value: any) => {
+  if (typeof value !== 'string') return false;
+  return propName.toLowerCase().includes('color') || value.startsWith('#') || value.startsWith('rgb') || value.startsWith('hsl');
+};
+
+const isCSSVariable = (value: string): boolean => {
+  if (typeof value !== 'string') return false;
+  return value.trim().startsWith('var(') && value.includes('--wst-');
+};
+
+const extractVariableName = (value: string): string | null => {
+  if (!isCSSVariable(value)) return null;
+  const match = value.match(/var\((--wst-[^)]+)\)/);
+  return match ? match[1] : null;
+};
+
+const getComputedCSSValue = (variableName: string): string => {
+  return getComputedStyle(document.documentElement).getPropertyValue(variableName).trim();
+};
+
+const getAllCSSVariables = (): string[] => {
+  const vars: string[] = [];
+  const styles = getComputedStyle(document.documentElement);
+  for (let i = 0; i < styles.length; i++) {
+    const prop = styles[i];
+    if (prop.startsWith('--wst-')) {
+      vars.push(prop);
+    }
+  }
+  return vars.sort();
+};
+
+const getColorVariables = (): string[] => {
+  return getAllCSSVariables().filter(v => v.includes('color') || v.includes('Color'));
+};
+
+const getTextVariables = (): string[] => {
+  // Only return composite font tokens (shorthand), not granular ones
+  return getAllCSSVariables().filter(v => 
+    v.includes('font') && (
+      v.includes('heading-') && v.endsWith('-font') ||
+      v.includes('paragraph-') && v.endsWith('-font') ||
+      v.includes('button-') && v.endsWith('-font')
+    )
+  );
+};
+
+const isNumericProperty = (propName: string, value: any): boolean => {
+  if (typeof value === 'number') return true;
+  if (typeof value !== 'string') return false;
+  const num = parseFloat(value);
+  return !isNaN(num) && isFinite(num) && !isSizeProperty(propName);
+};
+
+const getCSSPropertyOptions = (propName: string): string[] | null => {
+  const lowerProp = propName.toLowerCase();
+  const options: { [key: string]: string[] } = {
+    display: ['block', 'inline', 'inline-block', 'flex', 'grid', 'none', 'table', 'table-cell', 'table-row'],
+    position: ['static', 'relative', 'absolute', 'fixed', 'sticky'],
+    flexDirection: ['row', 'column', 'row-reverse', 'column-reverse'],
+    justifyContent: ['flex-start', 'flex-end', 'center', 'space-between', 'space-around', 'space-evenly'],
+    alignItems: ['flex-start', 'flex-end', 'center', 'baseline', 'stretch'],
+    textAlign: ['left', 'right', 'center', 'justify'],
+    fontWeight: ['normal', 'bold', '100', '200', '300', '400', '500', '600', '700', '800', '900'],
+    textDecoration: ['none', 'underline', 'overline', 'line-through'],
+    textTransform: ['none', 'uppercase', 'lowercase', 'capitalize'],
+    whiteSpace: ['normal', 'nowrap', 'pre', 'pre-wrap', 'pre-line'],
+    overflow: ['visible', 'hidden', 'scroll', 'auto'],
+    overflowX: ['visible', 'hidden', 'scroll', 'auto'],
+    overflowY: ['visible', 'hidden', 'scroll', 'auto'],
+    cursor: ['default', 'pointer', 'text', 'move', 'grab', 'grabbing', 'not-allowed', 'wait', 'help'],
+    visibility: ['visible', 'hidden', 'collapse'],
+    opacity: ['0', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '1'],
+  };
+  return options[lowerProp] || null;
+};
+
+const rgbToHex = (rgb: string) => {
+    if (typeof rgb !== 'string') {
+        return '#ffffff';
+    }
+    if (rgb.startsWith('#')) return rgb;
+
+    const el = document.createElement('div');
+    el.style.color = rgb;
+    document.body.appendChild(el);
+    const computedColor = window.getComputedStyle(el).color;
+    document.body.removeChild(el);
+    
+    const result = /^rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(computedColor);
+    if (result) {
+        return "#" +
+            ("0" + parseInt(result[1], 10).toString(16)).slice(-2) +
+            ("0" + parseInt(result[2], 10).toString(16)).slice(-2) +
+            ("0" + parseInt(result[3], 10).toString(16)).slice(-2);
+    }
+    
+    return rgb; // fallback
+};
+
+const TokenReference = () => {
+  const tokenGroups = [
+    {
+      title: 'Typography - Composite Heading Tokens (Use These!)',
+      tokens: ['--wst-heading-1-font', '--wst-heading-2-font', '--wst-heading-3-font', '--wst-heading-4-font', '--wst-heading-5-font', '--wst-heading-6-font'],
+      type: 'font'
+    },
+    {
+      title: 'Typography - Composite Paragraph Tokens (Use These!)',
+      tokens: ['--wst-paragraph-1-font', '--wst-paragraph-2-font', '--wst-paragraph-3-font'],
+      type: 'font'
+    },
+    {
+      title: 'Typography - Composite Button Tokens',
+      tokens: ['--wst-button-primary-font', '--wst-button-secondary-font', '--wst-button-tertiary-font'],
+      type: 'font'
+    },
+    {
+      title: 'Typography - Font Families (Atomic)',
+      tokens: ['--wst-font-family-default', '--wst-font-family-display', '--wst-font-family-heading', '--wst-font-family-body'],
+      type: 'font-family'
+    },
+    {
+      title: 'Typography - Font Sizes (Atomic)',
+      tokens: ['--wst-font-size-heading-1', '--wst-font-size-heading-2', '--wst-font-size-heading-3', '--wst-font-size-heading-4', '--wst-font-size-heading-5', '--wst-font-size-heading-6', '--wst-font-size-paragraph-1', '--wst-font-size-paragraph-2', '--wst-font-size-paragraph-3'],
+      type: 'font-size'
+    },
+    {
+      title: 'Typography - Font Weights (Atomic)',
+      tokens: ['--wst-font-weight-light', '--wst-font-weight-regular', '--wst-font-weight-medium', '--wst-font-weight-semibold', '--wst-font-weight-bold', '--wst-font-weight-extrabold'],
+      type: 'font-weight'
+    },
+    {
+      title: 'Typography - Line Heights (Atomic)',
+      tokens: ['--wst-line-height-tight', '--wst-line-height-normal', '--wst-line-height-relaxed'],
+      type: 'line-height'
+    },
+    {
+      title: 'Base Colors',
+      tokens: ['--wst-base-1-color', '--wst-base-2-color']
+    },
+    {
+      title: 'Shade Colors',
+      tokens: ['--wst-shade-1-color', '--wst-shade-2-color', '--wst-shade-3-color']
+    },
+    {
+      title: 'Accent Colors',
+      tokens: ['--wst-accent-1-color', '--wst-accent-2-color', '--wst-accent-3-color', '--wst-accent-4-color']
+    },
+    {
+      title: 'System Colors',
+      tokens: ['--wst-system-success-color', '--wst-system-error-color', '--wst-system-alert-color', '--wst-system-disabled-color', '--wst-system-default-dark-color', '--wst-system-default-light-color']
+    },
+    {
+      title: 'Background Aliases',
+      tokens: ['--wst-primary-background-color', '--wst-secondary-background-color']
+    },
+    {
+      title: 'Typography Colors',
+      tokens: ['--wst-heading-1-color', '--wst-heading-2-color', '--wst-heading-3-color', '--wst-heading-4-color', '--wst-heading-5-color', '--wst-heading-6-color', '--wst-paragraph-1-color', '--wst-paragraph-2-color', '--wst-paragraph-3-color']
+    },
+    {
+      title: 'Links & Actions',
+      tokens: ['--wst-links-and-actions-color']
+    },
+    {
+      title: 'Graphics',
+      tokens: ['--wst-graphics-1-color', '--wst-graphics-2-color']
+    },
+    {
+      title: 'Button Primary',
+      tokens: ['--wst-button-primary-background-color', '--wst-button-primary-color', '--wst-button-primary-border-top-color', '--wst-button-primary-border-right-color', '--wst-button-primary-border-bottom-color', '--wst-button-primary-border-left-color', '--wst-button-primary-text-highlight']
+    },
+    {
+      title: 'Button Secondary',
+      tokens: ['--wst-button-secondary-background-color', '--wst-button-secondary-color', '--wst-button-secondary-border-top-color', '--wst-button-secondary-border-right-color', '--wst-button-secondary-border-bottom-color', '--wst-button-secondary-border-left-color', '--wst-button-secondary-text-highlight']
+    },
+    {
+      title: 'Button Tertiary',
+      tokens: ['--wst-button-tertiary-background-color', '--wst-button-tertiary-color', '--wst-button-tertiary-border-top-color', '--wst-button-tertiary-border-right-color', '--wst-button-tertiary-border-bottom-color', '--wst-button-tertiary-border-left-color', '--wst-button-tertiary-text-highlight']
+    },
+    {
+      title: 'Box Primary',
+      tokens: ['--wst-box-primary-background-color', '--wst-box-primary-border-top-color', '--wst-box-primary-border-right-color', '--wst-box-primary-border-bottom-color', '--wst-box-primary-border-left-color']
+    },
+    {
+      title: 'Box Secondary',
+      tokens: ['--wst-box-secondary-background-color', '--wst-box-secondary-border-top-color', '--wst-box-secondary-border-right-color', '--wst-box-secondary-border-bottom-color', '--wst-box-secondary-border-left-color']
+    },
+    {
+      title: 'System Lines',
+      tokens: ['--wst-system-line-1-color', '--wst-system-line-2-color']
+    }
+  ];
+
+  const getComputedValue = (token: string) => {
+    return getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+  };
+
+  return (
+    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
+      <h1 style={{ fontSize: '24px', fontWeight: '600', color: '#111827', marginBottom: '8px' }}>Design Token Reference</h1>
+      <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '32px' }}>
+        All available design tokens for your components. Use <code style={{ background: '#f3f4f6', padding: '2px 6px', borderRadius: '4px', fontSize: '13px' }}>var(--token-name)</code> in your CSS.
+      </p>
+      
+      {tokenGroups.map((group, idx) => (
+        <div key={idx} style={{ marginBottom: '32px' }}>
+          <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#374151', marginBottom: '16px' }}>{group.title}</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '12px' }}>
+            {group.tokens.map((token) => {
+              const value = getComputedValue(token);
+              const isTransparent = value === 'transparent' || value === 'rgba(255, 255, 255, 0)';
+              const isTypography = group.type && ['font', 'font-family', 'font-size', 'font-weight', 'line-height'].includes(group.type);
+              
+              return (
+                <div 
+                  key={token}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '12px',
+                    background: '#ffffff',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    fontSize: '13px'
+                  }}
+                >
+                  {isTypography ? (
+                    <div 
+                      style={{
+                        width: '48px',
+                        height: '48px',
+                        borderRadius: '6px',
+                        background: '#f3f4f6',
+                        border: '1px solid #d1d5db',
+                        flexShrink: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: group.type === 'font-size' ? `var(${token})` : '18px',
+                        font: group.type === 'font' ? `var(${token})` : 'inherit',
+                        fontFamily: group.type === 'font-family' ? `var(${token})` : 'inherit',
+                        fontWeight: group.type === 'font-weight' ? `var(${token})` : 400,
+                        lineHeight: group.type === 'line-height' ? `var(${token})` : 'normal',
+                        color: '#374151'
+                      }}
+                    >
+                      Aa
+                    </div>
+                  ) : (
+                    <div 
+                      style={{
+                        width: '48px',
+                        height: '48px',
+                        borderRadius: '6px',
+                        background: isTransparent ? `repeating-conic-gradient(#e5e7eb 0% 25%, transparent 0% 50%) 50% / 8px 8px` : `var(${token})`,
+                        border: '1px solid #d1d5db',
+                        flexShrink: 0
+                      }}
+                    />
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: '500', color: '#111827', fontSize: '12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {token}
+                    </div>
+                    <div style={{ color: '#6b7280', fontSize: '11px', marginTop: '2px' }}>
+                      {value || 'not set'}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const App = () => {
   const [selectedComponent, setSelectedComponent] = useState('generated');
   const [code, setCode] = useState(initialCode);
   const [compiledResult, setCompiledResult] = useState<CompiledResult>(() => compileCode(initialCode));
   const [generatedOutput, setGeneratedOutput] = useState(initialGeneratedOutput);
   const [isMetadataPanelOpen, setIsMetadataPanelOpen] = useState(true);
+  const [isPropertiesPanelOpen, setIsPropertiesPanelOpen] = useState(true);
+  const [detailsCollapsedSections, setDetailsCollapsedSections] = useState<{ [key: string]: boolean }>({});
+  const [manifestJson, setManifestJson] = useState<any>(null);
+  const [componentProps, setComponentProps] = useState<any>({});
+  const [componentCssProps, setComponentCssProps] = useState<any>({});
+  const [selectorMap, setSelectorMap] = useState<{ [key: string]: string[] }>({});
+  const [selectedSelector, setSelectedSelector] = useState<string | null>(null);
+  const [selectedElementPath, setSelectedElementPath] = useState<string[] | null>(null);
+  const [isSelectionModeEnabled, setIsSelectionModeEnabled] = useState(false);
+  const [collapsedNodes, setCollapsedNodes] = useState<{ [key: string]: boolean }>({});
+  const componentContainerRef = useRef<HTMLDivElement>(null);
+  const componentPreviewAreaRef = useRef<HTMLDivElement>(null);
 
   const [parsedOutput, setParsedOutput] = useState<ParsedOutput>({
     designBrief: '',
@@ -909,7 +2577,12 @@ const App = () => {
     error: null,
   });
 
-  const [containerState, setContainerState] = useState({
+  const [containerState, setContainerState] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number | string;
+  }>({
     x: 50,
     y: 50,
     width: 500,
@@ -919,6 +2592,22 @@ const App = () => {
   const [csvResults, setCsvResults] = useState<CSVResult[]>([]);
   const [currentCSVIndex, setCurrentCSVIndex] = useState(0);
   const [isCSVMode, setIsCSVMode] = useState(false);
+
+  useEffect(() => {
+    const centerComponent = () => {
+      if (componentPreviewAreaRef.current) {
+        const previewWidth = componentPreviewAreaRef.current.offsetWidth;
+        setContainerState(prevState => ({
+          ...prevState,
+          x: (previewWidth - prevState.width) / 2,
+          y: 20,
+        }));
+      }
+    };
+    const timeoutId = setTimeout(centerComponent, 50);
+
+    return () => clearTimeout(timeoutId);
+  }, [selectedComponent, isCSVMode, currentCSVIndex, parsedOutput.component]);
 
   const parseAndCompileGeneratedOutput = (output: string) => {
     const designBriefMatch = output.match(/<design-brief>([\s\S]*?)<\/design-brief>/);
@@ -943,6 +2632,7 @@ const App = () => {
           ? '⚠️ Generation incomplete - Missing <react> tag. This row may have failed during generation. Use navigation to skip to the next result.'
           : 'Error: <react> tag not found in output. Please ensure your pasted output contains <react>...</react> tags.',
       });
+      setManifestJson(null);
       return;
     }
 
@@ -959,7 +2649,180 @@ const App = () => {
       component,
       error,
     });
+
+    try {
+      if (manifestMatch) {
+        setManifestJson(JSON.parse(manifestMatch[1].trim()));
+      } else {
+        setManifestJson(null);
+      }
+    } catch (e) {
+      console.error("Failed to parse manifest JSON:", e);
+      setManifestJson(null);
+    }
   };
+
+  useEffect(() => {
+    if (manifestJson && manifestJson.editorElement) {
+        // Reset image counter for each new component
+        imageCounter = 0;
+        
+        const initialState = buildInitialState(manifestJson.editorElement);
+        setComponentProps(initialState);
+        const initialCssState = buildInitialCssState(manifestJson.editorElement);
+        setComponentCssProps(initialCssState);
+        const newSelectorMap: { [key: string]: string[] } = {};
+        buildSelectorMap(manifestJson.editorElement, [], newSelectorMap);
+        setSelectorMap(newSelectorMap);
+        setSelectedSelector(manifestJson.editorElement.selector);
+        setSelectedElementPath([]);
+
+        const buildPathsToCollapse = (node: any, path: string, allPaths: { [key: string]: boolean }) => {
+            if (!node) return;
+            if (node.elements) {
+                Object.entries(node.elements).forEach(([key, value]: [string, any]) => {
+                    const newPath = `${path}.${key}`;
+                    allPaths[newPath] = true; // Collapse this child element
+                    buildPathsToCollapse(value.inlineElement, newPath, allPaths);
+                });
+            }
+        };
+
+        const initialCollapsedState: { [key: string]: boolean } = {};
+        buildPathsToCollapse(manifestJson.editorElement, 'root', initialCollapsedState);
+        setCollapsedNodes(initialCollapsedState);
+
+        if (manifestJson.installation?.initialSize) {
+          const { width: widthInfo, height: heightInfo } = manifestJson.installation.initialSize;
+          
+          setContainerState(prevState => {
+              let newWidth = prevState.width;
+              let newHeight = prevState.height;
+
+              if (widthInfo) {
+                  if (widthInfo.sizingType === 'pixels' && widthInfo.pixels) {
+                      newWidth = widthInfo.pixels;
+                  } else if (widthInfo.sizingType === 'stretched') {
+                      newWidth = 600; // A reasonable default for 'stretched' in the playground
+                  }
+              }
+
+              if (heightInfo) {
+                  if (heightInfo.sizingType === 'pixels' && heightInfo.pixels) {
+                      newHeight = heightInfo.pixels;
+                  } else if (heightInfo.sizingType === 'content') {
+                      newHeight = 'auto';
+                  }
+              }
+
+              return { ...prevState, width: newWidth, height: newHeight };
+          });
+      }
+    }
+  }, [manifestJson]);
+
+  const handlePropChange = (path: string[], value: any) => {
+    setComponentProps((prevProps: any) => {
+        const newProps = JSON.parse(JSON.stringify(prevProps)); // Simple deep clone
+        let current = newProps;
+        for (let i = 0; i < path.length - 1; i++) {
+            current = current[path[i]] = current[path[i]] || {};
+        }
+        current[path[path.length - 1]] = value;
+        return newProps;
+    });
+  };
+
+  const handleCssPropChange = (path: string[], propName: string, value: any) => {
+    setComponentCssProps((prevProps: any) => {
+        const newProps = JSON.parse(JSON.stringify(prevProps)); // Simple deep clone
+        let current = newProps;
+        for (let i = 0; i < path.length; i++) {
+             if (i % 2 === 0) { // 'elements'
+                current = current[path[i]] = current[path[i]] || {};
+            } else { // 'galleryControls'
+                current = current[path[i]] = current[path[i]] || {};
+            }
+        }
+        if (!current.properties) {
+            current.properties = {};
+        }
+        current.properties[propName] = value;
+        return newProps;
+    });
+  };
+
+  const handleComponentClick = (e: React.MouseEvent) => {
+    if (!isSelectionModeEnabled) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const overlay = e.currentTarget as HTMLElement;
+    
+    // Temporarily hide overlay to find element underneath
+    overlay.style.display = 'none';
+    const elementUnderneath = document.elementFromPoint(e.clientX, e.clientY);
+    overlay.style.display = 'block';
+
+    if (!elementUnderneath || !componentContainerRef.current || !componentContainerRef.current.contains(elementUnderneath)) {
+        if (manifestJson && manifestJson.editorElement) {
+            setSelectedSelector(manifestJson.editorElement.selector);
+            setSelectedElementPath([]);
+        }
+        return;
+    }
+    
+    let target = elementUnderneath as HTMLElement;
+
+    while(target && target !== componentContainerRef.current) {
+        for (const selector in selectorMap) {
+            if (target.matches(selector)) {
+                setSelectedSelector(selector);
+                setSelectedElementPath(selectorMap[selector]);
+                return;
+            }
+        }
+        target = target.parentElement as HTMLElement;
+    }
+
+    if (manifestJson && manifestJson.editorElement) {
+      setSelectedSelector(manifestJson.editorElement.selector);
+      setSelectedElementPath([]);
+    }
+  };
+
+
+  useEffect(() => {
+    if (!componentContainerRef.current || !manifestJson || Object.keys(componentCssProps).length === 0) return;
+
+    const applyStyles = (node: any, cssStateNode: any) => {
+        if (!node || !cssStateNode) return;
+
+        if (node.selector && cssStateNode.properties) {
+            try {
+              const element = componentContainerRef.current?.querySelector(node.selector);
+              if (element) {
+                  Object.entries(cssStateNode.properties).forEach(([prop, value]) => {
+                      const cssProp = prop.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
+                      (element as HTMLElement).style.setProperty(cssProp, value as string, 'important');
+                  });
+              }
+            } catch (e) {
+              // ignore invalid selector
+            }
+        }
+
+        if (node.elements && cssStateNode.elements) {
+            Object.entries(node.elements).forEach(([key, value]: [string, any]) => {
+                applyStyles(value.inlineElement, cssStateNode.elements[key]);
+            });
+        }
+    };
+
+    applyStyles(manifestJson.editorElement, componentCssProps);
+
+  }, [componentCssProps, manifestJson, parsedOutput.component]);
 
   useEffect(() => {
     if (isCSVMode && csvResults.length > 0) {
@@ -1048,28 +2911,64 @@ const App = () => {
     setCompiledResult(compileCode(newCode));
   };
 
+  const handleToggleNode = (path: string) => {
+    setCollapsedNodes(prev => ({ ...prev, [path]: !prev[path] }));
+  };
+
   const renderComponent = () => {
     switch (selectedComponent) {
       case '1':
-        return <Component1 />;
+        return <ErrorBoundary key={1}><Component1 /></ErrorBoundary>;
       case '2':
-        return <Component2 />;
+        return <ErrorBoundary key={2}><Component2 /></ErrorBoundary>;
+      case 'tokens':
+        return <TokenReference />;
       case 'generated': {
         const RenderedComponent = parsedOutput.component;
         if (parsedOutput.error) {
           return <div style={{ color: 'red', padding: '1rem' }}><strong>Error:</strong> {parsedOutput.error}</div>;
         }
         return RenderedComponent ? (
-          <>
-            <style>{parsedOutput.css}</style>
-            <RenderedComponent 
-              {...{
-                className: "generated-component",
-                id: "generated-component-1",
-                wix: {}
-              } as any}
-            />
-          </>
+          <ErrorBoundary key={isCSVMode ? csvResults[currentCSVIndex].index : generatedOutput}>
+            <div style={{position: 'relative', width: '100%', height: '100%'}}>
+              <div ref={componentContainerRef} className="component-container">
+                {selectedSelector && isSelectionModeEnabled && (
+                  <style>
+                    {`
+                      .component-container ${selectedSelector} {
+                        outline: 2px solid #2563eb !important;
+                        outline-offset: 2px;
+                      }
+                    `}
+                  </style>
+                )}
+                <style>{parsedOutput.css}</style>
+                <RenderedComponent 
+                  {...{
+                    className: "generated-component",
+                    id: "generated-component-1",
+                    wix: {},
+                    ...componentProps,
+                  } as any}
+                />
+              </div>
+              {isSelectionModeEnabled && (
+                <div 
+                  onClick={handleComponentClick} 
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    zIndex: 9999,
+                    cursor: 'crosshair',
+                    background: 'rgba(0, 100, 255, 0.05)',
+                  }}
+                />
+              )}
+            </div>
+          </ErrorBoundary>
         ) : <div>Compiling...</div>;
       }
       case 'live':
@@ -1077,80 +2976,136 @@ const App = () => {
           return <div style={{ color: 'red', padding: '1rem' }}><strong>Error:</strong> {compiledResult.error}</div>;
         }
         const LiveComponent = compiledResult.component;
-        return LiveComponent ? <LiveComponent /> : <div>Compiling...</div>;
+        return (
+          <ErrorBoundary key={code}>
+            {LiveComponent ? <LiveComponent /> : <div>Compiling...</div>}
+          </ErrorBoundary>
+        );
       default:
         return null;
     }
   };
 
-  const buttonStyle = (isActive: boolean): CSSProperties => ({
-    width: '100%',
-    padding: '12px 16px',
-    margin: '4px 0',
-    border: 'none',
-    borderRadius: '8px',
-    background: isActive ? '#0070f3' : '#ffffff',
-    color: isActive ? '#ffffff' : '#333333',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500',
-    textAlign: 'left',
-    transition: 'all 0.2s ease',
-    boxShadow: isActive ? '0 4px 14px 0 rgba(0, 118, 255, 0.39)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-  });
-
-  const handleButtonHover = (e: React.MouseEvent<HTMLButtonElement>, isHovering: boolean, isActive: boolean) => {
-    if (!isActive) {
-      const target = e.currentTarget;
-      target.style.background = isHovering ? '#f1f3f4' : '#ffffff';
-      target.style.transform = isHovering ? 'translateY(-1px)' : 'translateY(0)';
-    }
-  };
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', background: '#ffffff' }}>
+    <>
+      <style>{`
+        @keyframes slideInLeft {
+          from {
+            opacity: 0;
+            transform: translateX(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        @keyframes slideInRight {
+          from {
+            opacity: 0;
+            transform: translateX(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        input[type="range"] {
+          -webkit-appearance: none;
+          appearance: none;
+        }
+        input[type="range"]::-webkit-slider-track {
+          background: #f4f4f5;
+          height: 4px;
+          border-radius: 2px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+          background: #2563eb;
+          cursor: pointer;
+          margin-top: -4px;
+        }
+        input[type="range"]::-moz-range-track {
+          background: #f4f4f5;
+          height: 4px;
+          border-radius: 2px;
+        }
+        input[type="range"]::-moz-range-thumb {
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+          background: #2563eb;
+          cursor: pointer;
+          border: none;
+        }
+        input[type="range"]::-moz-range-progress {
+          background: #2563eb;
+          height: 4px;
+          border-radius: 2px;
+        }
+      `}</style>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', background: '#fafafa' }}>
       <div style={{ 
         display: 'flex',
         alignItems: 'center',
-        padding: '12px 24px', 
-        borderBottom: '1px solid #e5e7eb', 
+        padding: '0 20px', 
+        height: '48px',
+        borderBottom: '1px solid rgba(0, 0, 0, 0.06)', 
         background: '#ffffff',
+        backdropFilter: 'blur(8px)',
+        boxShadow: '0 1px 0 rgba(0, 0, 0, 0.02)',
       }}>
         <h2 style={{
           margin: 0,
-          marginRight: '24px',
-          fontSize: '18px',
+          marginRight: '32px',
+          fontSize: '14px',
           fontWeight: '600',
-          color: '#111827',
+          color: '#09090b',
+          letterSpacing: '-0.01em',
         }}>Components</h2>
         
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
           <button 
             style={navButtonStyle(selectedComponent === '1')}
             onClick={() => setSelectedComponent('1')}
           >
-            📊 Before/After Slider
+            <span style={{ marginRight: '6px' }}>📊</span>
+            Before/After Slider
           </button>
           
           <button 
             style={navButtonStyle(selectedComponent === '2')}
             onClick={() => setSelectedComponent('2')}
           >
-            🎨 Component 2
+            <span style={{ marginRight: '6px' }}>🎨</span>
+            Component 2
           </button>
           
           <button 
             style={navButtonStyle(selectedComponent === 'live')}
             onClick={() => setSelectedComponent('live')}
           >
-            ⚡ Live Editor
+            <span style={{ marginRight: '6px' }}>⚡</span>
+            Live Editor
           </button>
 
           <button 
             style={navButtonStyle(selectedComponent === 'generated')}
             onClick={() => setSelectedComponent('generated')}
           >
-            📄 Generated Output
+            <span style={{ marginRight: '6px' }}>📄</span>
+            Generated Output
+          </button>
+          
+          <button 
+            style={navButtonStyle(selectedComponent === 'tokens')}
+            onClick={() => setSelectedComponent('tokens')}
+          >
+            <span style={{ marginRight: '6px' }}>🎨</span>
+            Design Tokens
           </button>
         </div>
         
@@ -1168,22 +3123,25 @@ const App = () => {
                 <label
                   htmlFor="csv-upload"
                   style={{
-                    display: 'inline-block',
-                    padding: '8px 14px',
-                    border: '1px solid #2563eb',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '6px 12px',
                     borderRadius: '6px',
-                    background: '#2563eb',
+                    background: '#09090b',
                     color: '#ffffff',
                     cursor: 'pointer',
-                    fontSize: '13px',
+                    fontSize: '12px',
                     fontWeight: '500',
-                    transition: 'all 0.2s ease',
+                    transition: 'all 0.15s ease',
                     border: 'none',
+                    height: '32px',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
                   }}
-                  onMouseEnter={(e) => { const target = e.currentTarget; target.style.background = '#1d4ed8'; }}
-                  onMouseLeave={(e) => { const target = e.currentTarget; target.style.background = '#2563eb'; }}
+                  onMouseEnter={(e) => { const target = e.currentTarget; target.style.background = '#18181b'; target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)'; }}
+                  onMouseLeave={(e) => { const target = e.currentTarget; target.style.background = '#09090b'; target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)'; }}
                 >
-                  📁 Upload CSV
+                  <span style={{ marginRight: '6px' }}>📁</span>
+                  Upload CSV
                 </label>
                 {isCSVMode && csvResults.length > 0 && (
                   <button
@@ -1194,15 +3152,19 @@ const App = () => {
                     }}
                     style={{
                       marginLeft: '8px',
-                      padding: '8px 12px',
-                      border: '1px solid #e5e7eb',
+                      padding: '6px 12px',
+                      border: '1px solid rgba(0, 0, 0, 0.08)',
                       borderRadius: '6px',
                       background: '#ffffff',
-                      color: '#374151',
+                      color: '#71717a',
                       cursor: 'pointer',
-                      fontSize: '13px',
+                      fontSize: '12px',
                       fontWeight: '500',
+                      height: '32px',
+                      transition: 'all 0.15s ease',
                     }}
+                    onMouseEnter={(e) => { const target = e.currentTarget; target.style.background = '#fafafa'; target.style.color = '#27272a'; }}
+                    onMouseLeave={(e) => { const target = e.currentTarget; target.style.background = '#ffffff'; target.style.color = '#71717a'; }}
                   >
                     ✕ Clear ({csvResults.length})
                   </button>
@@ -1222,14 +3184,19 @@ const App = () => {
                     value={currentCSVIndex}
                     onChange={(e) => setCurrentCSVIndex(parseInt(e.target.value))}
                     style={{
-                      padding: '7px 10px',
-                      border: '1px solid #dcdcdc',
+                      padding: '6px 10px',
+                      border: '1px solid rgba(0, 0, 0, 0.08)',
                       borderRadius: '6px',
-                      fontSize: '13px',
+                      fontSize: '12px',
                       background: '#ffffff',
                       cursor: 'pointer',
-                      minWidth: '200px'
+                      minWidth: '200px',
+                      height: '32px',
+                      color: '#09090b',
+                      transition: 'all 0.15s ease',
                     }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.12)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
                   >
                     {csvResults.map((result, idx) => {
                       const isValid = result.generatedOutput.includes('<react>');
@@ -1267,9 +3234,9 @@ const App = () => {
       </div>
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <div style={{ 
-          width: selectedComponent === 'generated' && isCSVMode ? '0px' : '320px',
-          padding: selectedComponent === 'generated' && isCSVMode ? '0' : '24px',
-          borderRight: selectedComponent === 'generated' && isCSVMode ? 'none' : '1px solid #e5e7eb',
+          width: (selectedComponent === 'generated' && isCSVMode) || selectedComponent === 'tokens' ? '0px' : '320px',
+          padding: (selectedComponent === 'generated' && isCSVMode) || selectedComponent === 'tokens' ? '0' : '20px',
+          borderRight: (selectedComponent === 'generated' && isCSVMode) || selectedComponent === 'tokens' ? 'none' : '1px solid rgba(0, 0, 0, 0.06)',
           overflowY: 'auto', 
           background: '#ffffff',
           transition: 'all 0.3s ease-in-out',
@@ -1280,18 +3247,19 @@ const App = () => {
           {selectedComponent === 'live' && (
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%'}}>
               <h3 style={{
-                fontSize: '16px',
+                fontSize: '12px',
                 fontWeight: '600',
-                color: '#111827',
-                marginBottom: '16px',
-                flexShrink: 0
+                color: '#09090b',
+                marginBottom: '12px',
+                flexShrink: 0,
+                letterSpacing: '-0.01em'
               }}>Code Editor</h3>
               <div style={{ 
-                border: '1px solid #d1d4d8', 
-                borderRadius: '8px', 
+                border: '1px solid rgba(0, 0, 0, 0.08)', 
+                borderRadius: '6px', 
                 overflow: 'hidden', 
                 background: '#ffffff',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
                 flex: 1,
                 minHeight: 0
               }}>
@@ -1317,24 +3285,25 @@ const App = () => {
               {!isCSVMode && (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexShrink: 0 }}>
-                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '500', color: '#374151' }}>
+                    <h3 style={{ margin: 0, fontSize: '13px', fontWeight: '600', color: '#09090b', letterSpacing: '-0.01em' }}>
                       Paste Generated Output
                     </h3>
                     <button
                       onClick={() => setGeneratedOutput('')}
                       style={{
-                        padding: '6px 12px',
-                        border: '1px solid #d1d4d8',
-                        borderRadius: '6px',
+                        padding: '5px 10px',
+                        border: '1px solid rgba(0, 0, 0, 0.08)',
+                        borderRadius: '5px',
                         background: '#ffffff',
-                        color: '#374151',
+                        color: '#71717a',
                         cursor: 'pointer',
-                        fontSize: '13px',
+                        fontSize: '11px',
                         fontWeight: '500',
-                        transition: 'all 0.2s ease',
+                        transition: 'all 0.15s ease',
+                        height: '24px',
                       }}
-                      onMouseEnter={(e) => { const target = e.currentTarget; target.style.background = '#f9fafb'; }}
-                      onMouseLeave={(e) => { const target = e.currentTarget; target.style.background = '#ffffff'; }}
+                      onMouseEnter={(e) => { const target = e.currentTarget; target.style.background = '#fafafa'; target.style.color = '#27272a'; }}
+                      onMouseLeave={(e) => { const target = e.currentTarget; target.style.background = '#ffffff'; target.style.color = '#71717a'; }}
                     >
                       Clear
                     </button>
@@ -1344,136 +3313,373 @@ const App = () => {
                     onChange={(e) => setGeneratedOutput(e.target.value)}
                     style={{
                       width: '100%',
-                      fontFamily: '"Fira Code", "SF Mono", Monaco, monospace',
-                      fontSize: 13,
-                      border: '1px solid #d1d4d8',
-                      borderRadius: '8px',
-                      padding: '12px',
-                      boxSizing: 'border-box',
-                      resize: 'vertical',
-                      flex: 1
-                    }}
+                        fontFamily: '"Fira Code", "SF Mono", Monaco, monospace',
+                        fontSize: 12,
+                        border: '1px solid rgba(0, 0, 0, 0.08)',
+                        borderRadius: '6px',
+                        padding: '12px',
+                        boxSizing: 'border-box',
+                        resize: 'vertical',
+                        flex: 1,
+                        background: '#ffffff',
+                        color: '#09090b',
+                        transition: 'border-color 0.15s ease',
+                      }}
+                      onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.2)'; }}
+                      onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
                   />
                 </>
               )}
             </div>
           )}
         </div>
-        <div style={{ 
+        <div ref={componentPreviewAreaRef} style={{ 
           flex: 1, 
-          padding: '24px', 
+          padding: '20px', 
           position: 'relative', 
-          background: '#f9fafb',
+          background: '#fafafa',
           minHeight: 0,
           display: 'flex',
           gap: '20px'
         }}>
-          {selectedComponent === 'generated' ? (
+          {selectedComponent === 'tokens' ? (
+            <div style={{ flex: 1, overflow: 'auto', background: '#ffffff', borderRadius: '12px' }}>
+              <TokenReference />
+            </div>
+          ) : selectedComponent === 'generated' ? (
             <div style={{
               display: 'flex',
               width: '100%',
-              gap: '20px'
+              position: 'relative'
             }}>
+              {/* Floating Details Panel */}
               {isMetadataPanelOpen && (
                 <div style={{
-                  flex: 0.5,
-                  background: 'white',
-                  padding: '24px',
-                  borderRadius: '12px',
-                  overflow: 'auto',
-                  border: '1px solid #e5e7eb',
-                  transition: 'all 0.3s ease',
-                  minWidth: '250px',
+                  position: 'absolute',
+                  top: '16px',
+                  left: '16px',
+                  width: '360px',
+                  height: 'calc(100% - 32px)',
+                  maxHeight: 'calc(100% - 32px)',
+                  background: '#ffffff',
+                  padding: '0',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  border: '1px solid rgba(0, 0, 0, 0.08)',
+                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04)',
+                  zIndex: 100,
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  animation: 'slideInLeft 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                    <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#111827' }}>Details</h2>
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center', 
+                    padding: '14px 16px',
+                    borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+                    background: '#fafafa',
+                    flexShrink: 0,
+                  }}>
+                    <h2 style={{ margin: 0, fontSize: '13px', fontWeight: '600', color: '#09090b', letterSpacing: '-0.01em' }}>Details</h2>
                     <button
                       onClick={() => setIsMetadataPanelOpen(false)}
                       style={{
                         background: 'transparent',
                         border: 'none',
-                        borderRadius: '50%',
-                        width: '32px',
-                        height: '32px',
+                        borderRadius: '4px',
+                        width: '24px',
+                        height: '24px',
                         cursor: 'pointer',
-                        fontSize: '20px',
-                        lineHeight: '32px',
-                        color: '#666666',
-                        transition: 'all 0.2s ease',
+                        fontSize: '16px',
+                        lineHeight: '24px',
+                        color: '#71717a',
+                        transition: 'all 0.15s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 0,
                       }}
-                      onMouseEnter={(e) => { const target = e.currentTarget; target.style.background = '#f0f0f0'; target.style.color = '#111111'; }}
-                      onMouseLeave={(e) => { const target = e.currentTarget; target.style.background = 'transparent'; target.style.color = '#666666'; }}
+                      onMouseEnter={(e) => { const target = e.currentTarget; target.style.background = '#f4f4f5'; target.style.color = '#27272a'; }}
+                      onMouseLeave={(e) => { const target = e.currentTarget; target.style.background = 'transparent'; target.style.color = '#71717a'; }}
                     >
                       &times;
                     </button>
                   </div>
+                  <div style={{ 
+                    padding: '16px', 
+                    overflowY: 'auto', 
+                    overflowX: 'hidden',
+                    flex: 1,
+                    minHeight: 0,
+                  }}>
                   {isCSVMode && csvResults.length > 0 && (
                     <>
                       <div style={{
-                        background: '#f9fafb',
-                        padding: '16px',
-                        borderRadius: '8px',
-                        marginBottom: '20px',
-                        border: '1px solid #e5e7eb'
+                        background: '#fafafa',
+                        padding: '12px',
+                        borderRadius: '6px',
+                        marginBottom: '16px',
+                        border: '1px solid rgba(0, 0, 0, 0.06)'
                       }}>
-                        <h3 style={{ marginTop: 0, marginBottom: '12px', fontSize: '14px', fontWeight: '600', color: '#111827' }}>Prompt</h3>
-                        <p style={{ margin: 0, fontSize: '13px', lineHeight: '1.6', color: '#374151' }}>
-                          {csvResults[currentCSVIndex].prompt}
-                        </p>
-                        {csvResults[currentCSVIndex].category && (
+                        <div 
+                          onClick={() => setDetailsCollapsedSections(prev => ({ ...prev, prompt: !prev.prompt }))}
+                          style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', marginBottom: '8px' }}
+                        >
+                          <span style={{ marginRight: '6px', fontSize: '10px', color: '#71717a', width: '10px' }}>
+                            {detailsCollapsedSections.prompt ? '▸' : '▾'}
+                          </span>
+                          <h3 style={{ margin: 0, fontSize: '11px', fontWeight: '600', color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Prompt</h3>
+                        </div>
+                        {!detailsCollapsedSections.prompt && (
                           <>
-                            <h3 style={{ marginTop: '16px', marginBottom: '8px', fontSize: '14px', fontWeight: '600', color: '#111827' }}>Category</h3>
-                            <span style={{
-                              display: 'inline-block',
-                              background: '#eff6ff',
-                              color: '#2563eb',
-                              padding: '4px 10px',
-                              borderRadius: '9999px',
-                              fontSize: '12px',
-                              fontWeight: '500'
-                            }}>
-                              {csvResults[currentCSVIndex].category}
-                            </span>
+                            <p style={{ margin: '0 0 0 16px', fontSize: '12px', lineHeight: '1.5', color: '#27272a' }}>
+                              {csvResults[currentCSVIndex].prompt}
+                            </p>
+                            {csvResults[currentCSVIndex].category && (
+                              <>
+                                <h3 style={{ marginTop: '12px', marginBottom: '6px', fontSize: '11px', fontWeight: '600', color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Category</h3>
+                                <span style={{
+                                  display: 'inline-block',
+                                  background: '#f4f4f5',
+                                  color: '#09090b',
+                                  padding: '3px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: '500'
+                                }}>
+                                  {csvResults[currentCSVIndex].category}
+                                </span>
+                              </>
+                            )}
                           </>
                         )}
                       </div>
-                      <hr style={{margin: '24px 0', border: 'none', borderTop: '1px solid #e5e7eb'}} />
+                      <hr style={{margin: '16px 0', border: 'none', borderTop: '1px solid rgba(0, 0, 0, 0.06)'}} />
                     </>
                   )}
-                  <h3 style={{ marginTop: 0, fontSize: '16px', fontWeight: '600', color: '#111827' }}>Design Brief</h3>
-                  <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '12px', background: '#f9fafb', padding: '12px', borderRadius: '6px', border: '1px solid #e5e7eb' }}>{parsedOutput.designBrief}</pre>
-                  <hr style={{margin: '24px 0', border: 'none', borderTop: '1px solid #e5e7eb'}} />
-                  <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#111827' }}>Manifest</h3>
-                  <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '12px', background: '#f9fafb', padding: '12px', borderRadius: '6px', border: '1px solid #e5e7eb' }}>{parsedOutput.manifest}</pre>
+                  <div style={{ marginBottom: '16px' }}>
+                    <div 
+                      onClick={() => setDetailsCollapsedSections(prev => ({ ...prev, brief: !prev.brief }))}
+                      style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', marginBottom: '8px' }}
+                    >
+                      <span style={{ marginRight: '6px', fontSize: '10px', color: '#71717a', width: '10px' }}>
+                        {detailsCollapsedSections.brief ? '▸' : '▾'}
+                      </span>
+                      <h3 style={{ margin: 0, fontSize: '11px', fontWeight: '600', color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Design Brief</h3>
+                    </div>
+                    {!detailsCollapsedSections.brief && (
+                      <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '11px', background: '#fafafa', padding: '12px', borderRadius: '6px', border: '1px solid rgba(0, 0, 0, 0.06)', color: '#27272a', lineHeight: '1.5', margin: '0 0 0 16px' }}>{parsedOutput.designBrief}</pre>
+                    )}
+                  </div>
+                  <hr style={{margin: '16px 0', border: 'none', borderTop: '1px solid rgba(0, 0, 0, 0.06)'}} />
+                  <div>
+                    <div 
+                      onClick={() => setDetailsCollapsedSections(prev => ({ ...prev, manifest: !prev.manifest }))}
+                      style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', marginBottom: '8px' }}
+                    >
+                      <span style={{ marginRight: '6px', fontSize: '10px', color: '#71717a', width: '10px' }}>
+                        {detailsCollapsedSections.manifest ? '▸' : '▾'}
+                      </span>
+                      <h3 style={{ margin: 0, fontSize: '11px', fontWeight: '600', color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Manifest</h3>
+                    </div>
+                    {!detailsCollapsedSections.manifest && (
+                      <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '11px', background: '#fafafa', padding: '12px', borderRadius: '6px', border: '1px solid rgba(0, 0, 0, 0.06)', color: '#27272a', lineHeight: '1.5', margin: '0 0 0 16px' }}>{parsedOutput.manifest}</pre>
+                    )}
+                  </div>
+                  </div>
                 </div>
               )}
+
+              {/* Floating Properties Panel */}
+              {isPropertiesPanelOpen && (
+                <div style={{
+                  position: 'absolute',
+                  top: '16px',
+                  right: '16px',
+                  width: '360px',
+                  height: 'calc(100% - 32px)',
+                  maxHeight: 'calc(100% - 32px)',
+                  background: '#ffffff',
+                  padding: '0',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  border: '1px solid rgba(0, 0, 0, 0.08)',
+                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04)',
+                  zIndex: 100,
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  animation: 'slideInRight 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center', 
+                    padding: '14px 16px',
+                    borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+                    background: '#fafafa',
+                    flexShrink: 0,
+                  }}>
+                    <h2 style={{ margin: 0, fontSize: '13px', fontWeight: '600', color: '#09090b', letterSpacing: '-0.01em' }}>Properties</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <button
+                        onClick={() => setIsSelectionModeEnabled(!isSelectionModeEnabled)}
+                        style={{
+                          background: isSelectionModeEnabled ? '#f4f4f5' : 'transparent',
+                          border: 'none',
+                          borderRadius: '4px',
+                          width: '24px',
+                          height: '24px',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          lineHeight: '24px',
+                          color: isSelectionModeEnabled ? '#09090b' : '#71717a',
+                          transition: 'all 0.15s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: 0,
+                        }}
+                        title="Selection Mode"
+                        onMouseEnter={(e) => { const target = e.currentTarget; if (!isSelectionModeEnabled) { target.style.background = '#f4f4f5'; target.style.color = '#27272a'; } }}
+                        onMouseLeave={(e) => { const target = e.currentTarget; if (!isSelectionModeEnabled) { target.style.background = 'transparent'; target.style.color = '#71717a'; } }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/>
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => setIsPropertiesPanelOpen(false)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          borderRadius: '4px',
+                          width: '24px',
+                          height: '24px',
+                          cursor: 'pointer',
+                          fontSize: '16px',
+                          lineHeight: '24px',
+                          color: '#71717a',
+                          transition: 'all 0.15s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: 0,
+                        }}
+                        onMouseEnter={(e) => { const target = e.currentTarget; target.style.background = '#f4f4f5'; target.style.color = '#27272a'; }}
+                        onMouseLeave={(e) => { const target = e.currentTarget; target.style.background = 'transparent'; target.style.color = '#71717a'; }}
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ 
+                    padding: '16px', 
+                    overflowY: 'auto', 
+                    overflowX: 'hidden',
+                    flex: 1,
+                    minHeight: 0,
+                  }}>
+                    {(() => {
+                      if (!manifestJson || !manifestJson.editorElement || selectedElementPath === null) {
+                        return <p>Select an element to see its properties.</p>;
+                      }
+                      
+                      const node = selectedElementPath.length > 0 ? getNodeByPath(manifestJson.editorElement, selectedElementPath) : manifestJson.editorElement;
+                      
+                      if (!node) {
+                        return <p>Could not find the selected element in the manifest.</p>
+                      }
+                      
+                      const nodeToRender = node.inlineElement || node;
+                      
+                      let propPath = ['root'];
+                      let cssPath = ['rootCss'];
+
+                      selectedElementPath.forEach(segment => {
+                          if (segment === 'elements') {
+                              propPath.push('elementProps');
+                              cssPath.push('elements');
+                          } else {
+                              propPath.push(segment);
+                              cssPath.push(segment);
+                          }
+                      });
+
+
+                      return <ManifestNode
+                        node={nodeToRender}
+                        nodeKey={nodeToRender.displayName || 'Selected Element'}
+                        path="root"
+                        propPath={propPath}
+                        cssPath={cssPath}
+                        props={componentProps}
+                        onPropChange={handlePropChange}
+                        cssProps={componentCssProps}
+                        onCssChange={handleCssPropChange}
+                        collapsedNodes={collapsedNodes}
+                        onToggleNode={handleToggleNode}
+                      />
+                    })()}
+                  </div>
+                </div>
+              )}
+
+              {/* Main Component Area */}
               <div style={{
-                flex: 1.5,
+                flex: 1,
                 position: 'relative'
               }}>
-                {!isMetadataPanelOpen && (
+                <div style={{ position: 'absolute', top: '0px', left: '0px', zIndex: 20, display: 'flex', gap: '8px' }}>
+                  {!isMetadataPanelOpen && (
                   <button
                     onClick={() => setIsMetadataPanelOpen(true)}
                     style={{
-                      position: 'absolute',
-                      top: '0px',
-                      left: '0px',
-                      zIndex: 20,
-                      padding: '8px 12px',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '6px',
+                      padding: '6px 10px',
+                      border: '1px solid rgba(0, 0, 0, 0.08)',
+                      borderRadius: '5px',
                       background: '#ffffff',
-                      color: '#374151',
+                      color: '#71717a',
                       cursor: 'pointer',
-                      fontSize: '13px',
+                      fontSize: '11px',
                       fontWeight: '500',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                      transition: 'all 0.2s ease',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                      transition: 'all 0.15s ease',
+                      height: '28px',
                     }}
-                    onMouseEnter={(e) => { const target = e.currentTarget; target.style.background = '#f9fafb'; }}
-                    onMouseLeave={(e) => { const target = e.currentTarget; target.style.background = '#ffffff'; }}
+                    onMouseEnter={(e) => { const target = e.currentTarget; target.style.background = '#fafafa'; target.style.color = '#27272a'; target.style.borderColor = 'rgba(0, 0, 0, 0.12)'; }}
+                    onMouseLeave={(e) => { const target = e.currentTarget; target.style.background = '#ffffff'; target.style.color = '#71717a'; target.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
                   >
                     Show Details
+                  </button>
+                  )}
+                </div>
+                {!isPropertiesPanelOpen && (
+                  <button
+                    onClick={() => setIsPropertiesPanelOpen(true)}
+                    style={{
+                      position: 'absolute',
+                      top: '0px',
+                      right: '0px',
+                      zIndex: 20,
+                      padding: '6px 10px',
+                      border: '1px solid rgba(0, 0, 0, 0.08)',
+                      borderRadius: '5px',
+                      background: '#ffffff',
+                      color: '#71717a',
+                      cursor: 'pointer',
+                      fontSize: '11px',
+                      fontWeight: '500',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                      transition: 'all 0.15s ease',
+                      height: '28px',
+                    }}
+                    onMouseEnter={(e) => { const target = e.currentTarget; target.style.background = '#fafafa'; target.style.color = '#27272a'; target.style.borderColor = 'rgba(0, 0, 0, 0.12)'; }}
+                    onMouseLeave={(e) => { const target = e.currentTarget; target.style.background = '#ffffff'; target.style.color = '#71717a'; target.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
+                  >
+                    Show Properties
                   </button>
                 )}
                 <Suspense fallback={<div>Loading...</div>}>
@@ -1499,33 +3705,41 @@ const App = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 
 const navButtonStyle = (isActive: boolean): CSSProperties => ({
-  padding: '8px 16px',
+  padding: '6px 12px',
   margin: 0,
   border: 'none',
-  borderRadius: '6px',
-  background: isActive ? '#f3f4f6' : 'transparent',
-  color: isActive ? '#1f2937' : '#6b7280',
+  borderRadius: '5px',
+  background: isActive ? '#f4f4f5' : 'transparent',
+  color: isActive ? '#09090b' : '#71717a',
   cursor: 'pointer',
-  fontSize: '14px',
+  fontSize: '12px',
   fontWeight: '500',
   textAlign: 'center',
-  transition: 'all 0.2s ease',
+  transition: 'all 0.15s ease',
+  display: 'inline-flex',
+  alignItems: 'center',
+  height: '32px',
 });
 
 const paginationButtonStyle = (disabled: boolean, isSecondary: boolean = false): CSSProperties => ({
-  padding: '8px 12px',
-  border: `1px solid ${isSecondary ? '#16a34a' : '#e5e7eb'}`,
-  borderRadius: '6px',
-  background: disabled ? '#f9fafb' : '#ffffff',
-  color: disabled ? '#9ca3af' : isSecondary ? '#16a34a' : '#374151',
+  padding: '6px 10px',
+  border: `1px solid ${isSecondary ? 'rgba(22, 163, 74, 0.2)' : 'rgba(0, 0, 0, 0.08)'}`,
+  borderRadius: '5px',
+  background: disabled ? '#fafafa' : '#ffffff',
+  color: disabled ? '#d4d4d8' : isSecondary ? '#16a34a' : '#71717a',
   cursor: disabled ? 'not-allowed' : 'pointer',
-  fontSize: '14px',
+  fontSize: '12px',
   fontWeight: '500',
-  transition: 'all 0.2s ease',
+  transition: 'all 0.15s ease',
+  height: '32px',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
 });
 
 

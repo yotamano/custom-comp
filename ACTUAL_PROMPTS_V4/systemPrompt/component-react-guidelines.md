@@ -1,0 +1,21 @@
+React component guidelines:
+
+- Import `./style.css` at the top of the component file.
+- Component must be a pure function, SSR-safe:
+  - No browser APIs at module scope.
+  - If using browser-specific APIs, always do so inside useEffect or other client-side hooks
+  - Guard in hooks: `if (typeof window === 'undefined') return;`
+- Props surface must match the manifest
+- **The manifest is the single source of truth.** The React component should NOT contain its own separate default logic. It should be written to correctly render the props it receives. The platform will provide default values based on the manifest's `defaultValue`.
+- Class names must exactly match manifest selectors; no inline styles.
+- Inner elements must follow manifest hierarchy; conditionally render according to the element's removal state
+- Links and media must be driven by `data` items (`link`, `image`, `vectorArt`) from the manifest; do not hardcode.
+- Accessibility:
+  - Map `a11y` data to DOM attributes (`aria-*`, `role`, `tabIndex`).
+- Types:
+  - Declare all interfaces/types at the top; no inline or unused types.
+  - Omit the `wix` prop entirely if no removable elements exist in the manifest.
+- Exports: Use default export consistently.
+- No TypeScript errors; no unused variables.
+- Implementation: Write complete, fully functional code; no unimplemented logic, placeholders, or TODO comments for later implementation.
+- For props that are arrays (e.g., a list of items), always provide a default empty array in the component's function signature (e.g., `const { items = [] } = props;`). Never assume an array prop will be provided. Before mapping over an array prop, ensure it is actually an array.
