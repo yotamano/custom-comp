@@ -2859,6 +2859,56 @@ const App = () => {
     reader.readAsText(file);
   };
 
+  const handleLoadLastCSV = async () => {
+    try {
+      // Fetch the CSV file from the public folder
+      // Use the base path from vite config (/custom-comp/)
+      const basePath = '/custom-comp/';
+      const folderPath = `${basePath}last-output-testset/`;
+      
+      // Try to find the CSV file - first try common filenames
+      const possibleFiles = [
+        'prompt-3-Custom Component (updated)-5.2.0.csv',
+        'latest.csv', // Fallback if user renames to latest.csv
+      ];
+      
+      let csvText: string | null = null;
+      let lastError: Error | null = null;
+      
+      // Try each possible filename
+      for (const filename of possibleFiles) {
+        try {
+          const csvPath = `${folderPath}${filename}`;
+          const response = await fetch(csvPath);
+          if (response.ok) {
+            csvText = await response.text();
+            break; // Found a file, stop trying
+          }
+        } catch (error) {
+          lastError = error as Error;
+          continue; // Try next file
+        }
+      }
+      
+      if (!csvText) {
+        throw lastError || new Error('No CSV file found in last-output-testset folder');
+      }
+      
+      const results = parseCSV(csvText);
+      if (results.length > 0) {
+        setCsvResults(results);
+        setCurrentCSVIndex(0);
+        setIsCSVMode(true);
+        setSelectedComponent('generated');
+      } else {
+        alert('No valid results found in CSV file.');
+      }
+    } catch (error) {
+      console.error('Failed to load CSV:', error);
+      alert('Failed to load the last CSV file. Make sure the file exists in the public/last-output-testset folder.');
+    }
+  };
+
   const goToPreviousResult = () => {
     if (currentCSVIndex > 0) {
       setCurrentCSVIndex(currentCSVIndex - 1);
@@ -3142,6 +3192,34 @@ const App = () => {
                   <span style={{ marginRight: '6px' }}>📁</span>
                   Upload CSV
                 </label>
+                <button
+                  onClick={handleLoadLastCSV}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    background: '#ffffff',
+                    color: '#09090b',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    transition: 'all 0.15s ease',
+                    border: '1px solid rgba(0, 0, 0, 0.08)',
+                    height: '32px',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                  }}
+                  onMouseEnter={(e) => { const target = e.currentTarget; target.style.background = '#f4f4f5'; target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)'; }}
+                  onMouseLeave={(e) => { const target = e.currentTarget; target.style.background = '#ffffff'; target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)'; }}
+                  title="Load last generated CSV"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                  Load Last CSV
+                </button>
                 {isCSVMode && csvResults.length > 0 && (
                   <button
                     onClick={() => {

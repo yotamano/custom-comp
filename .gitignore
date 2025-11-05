@@ -33,3 +33,7 @@ yarn-error.log*
 *.csv
 *.zip
 *.txt
+
+# Exception: Allow CSV files in public folder for GitHub Pages
+!public/**/*.csv
+!last-output-testset/*.csv
