@@ -1170,7 +1170,7 @@ const getNodeByPath = (rootNode: any, path: string[]) => {
   return currentNode;
 };
 
-const isNumeric = (val: any): val is number | string => !isNaN(parseFloat(val)) && isFinite(val);
+// const isNumeric = (val: any): val is number | string => !isNaN(parseFloat(val)) && isFinite(val);
 
 const parseUnitValue = (value: string | number): { value: number, unit: string } => {
     if (typeof value === 'number') return { value, unit: '' };
@@ -1187,62 +1187,62 @@ const isSizeProperty = (propName: string) => {
     return sizeKeywords.some(keyword => lowerPropName.includes(keyword));
 };
 
-const UnitInput: React.FC<{
-    value: string;
-    onChange: (newValue: string) => void;
-}> = ({ value, onChange }) => {
-    const { value: numValue, unit: currentUnit } = parseUnitValue(value);
-
-    const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        onChange(`${e.target.value}${currentUnit}`);
-    };
-
-    const handleUnitChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        onChange(`${numValue}${e.target.value}`);
-    };
-
-    return (
-        <div style={{ display: 'flex', alignItems: 'center', width: '120px' }}>
-            <input
-                type="number"
-                value={numValue}
-                onChange={handleValueChange}
-                style={{ 
-                    padding: '4px 8px', 
-                    borderRadius: '4px 0 0 4px', 
-                    border: '1px solid rgba(0, 0, 0, 0.08)', 
-                    width: '70%', 
-                    fontSize: '11px', 
-                    borderRight: 'none',
-                    background: '#ffffff',
-                    color: '#09090b',
-                    transition: 'border-color 0.15s ease',
-                }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.2)'; }}
-                onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
-            />
-            <select 
-                value={currentUnit} 
-                onChange={handleUnitChange} 
-                style={{ 
-                    padding: '4px 2px', 
-                    borderRadius: '0 4px 4px 0', 
-                    border: '1px solid rgba(0, 0, 0, 0.08)', 
-                    width: '30%', 
-                    fontSize: '11px', 
-                    background: '#fafafa',
-                    color: '#09090b',
-                    cursor: 'pointer',
-                    transition: 'border-color 0.15s ease',
-                }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.2)'; }}
-                onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
-            >
-                {sizeUnits.map(u => <option key={u} value={u}>{u}</option>)}
-            </select>
-        </div>
-    );
-};
+// const UnitInput: React.FC<{
+//     value: string;
+//     onChange: (newValue: string) => void;
+// }> = ({ value, onChange }) => {
+//     const { value: numValue, unit: currentUnit } = parseUnitValue(value);
+//
+//     const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+//         onChange(`${e.target.value}${currentUnit}`);
+//     };
+//
+//     const handleUnitChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+//         onChange(`${numValue}${e.target.value}`);
+//     };
+//
+//     return (
+//         <div style={{ display: 'flex', alignItems: 'center', width: '120px' }}>
+//             <input
+//                 type="number"
+//                 value={numValue}
+//                 onChange={handleValueChange}
+//                 style={{ 
+//                     padding: '4px 8px', 
+//                     borderRadius: '4px 0 0 4px', 
+//                     border: '1px solid rgba(0, 0, 0, 0.08)', 
+//                     width: '70%', 
+//                     fontSize: '11px', 
+//                     borderRight: 'none',
+//                     background: '#ffffff',
+//                     color: '#09090b',
+//                     transition: 'border-color 0.15s ease',
+//                 }}
+//                 onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.2)'; }}
+//                 onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
+//             />
+//             <select 
+//                 value={currentUnit} 
+//                 onChange={handleUnitChange} 
+//                 style={{ 
+//                     padding: '4px 2px', 
+//                     borderRadius: '0 4px 4px 0', 
+//                     border: '1px solid rgba(0, 0, 0, 0.08)', 
+//                     width: '30%', 
+//                     fontSize: '11px', 
+//                     background: '#fafafa',
+//                     color: '#09090b',
+//                     cursor: 'pointer',
+//                     transition: 'border-color 0.15s ease',
+//                 }}
+//                 onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.2)'; }}
+//                 onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
+//             >
+//                 {sizeUnits.map(u => <option key={u} value={u}>{u}</option>)}
+//             </select>
+//         </div>
+//     );
+// };
 
 const SizeInputWithSlider: React.FC<{
     value: string;
@@ -1597,7 +1597,7 @@ const VariablePicker: React.FC<{
   onChange: (value: string) => void;
   type: 'color' | 'text';
   propName: string;
-}> = ({ value, onChange, type, propName }) => {
+}> = ({ value, onChange, type }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [customValue, setCustomValue] = useState('');
   const [mode, setMode] = useState<'variable' | 'custom'>('variable');
@@ -1662,13 +1662,6 @@ const VariablePicker: React.FC<{
     }
   };
 
-  // Get display value for preview
-  const getDisplayValue = () => {
-    if (isVariable) {
-      return computedValue || variableName || '';
-    }
-    return value || '';
-  };
 
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '120px' }}>
@@ -1726,7 +1719,7 @@ const VariablePicker: React.FC<{
           <span style={{ fontSize: '9px', color: '#2563eb', flexShrink: 0 }}>🔗</span>
         )}
         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '10px', minWidth: 0 }}>
-          {isVariable ? (variableName?.length > 12 ? variableName.substring(0, 10) + '...' : variableName) : (value || 'Custom')}
+          {isVariable ? (variableName && variableName.length > 12 ? variableName.substring(0, 10) + '...' : variableName || '') : (value || 'Custom')}
         </span>
         <span style={{ fontSize: '8px', color: '#71717a', flexShrink: 0 }}>▾</span>
       </div>
@@ -2345,28 +2338,28 @@ const getCSSPropertyOptions = (propName: string): string[] | null => {
   return options[lowerProp] || null;
 };
 
-const rgbToHex = (rgb: string) => {
-    if (typeof rgb !== 'string') {
-        return '#ffffff';
-    }
-    if (rgb.startsWith('#')) return rgb;
-
-    const el = document.createElement('div');
-    el.style.color = rgb;
-    document.body.appendChild(el);
-    const computedColor = window.getComputedStyle(el).color;
-    document.body.removeChild(el);
-    
-    const result = /^rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(computedColor);
-    if (result) {
-        return "#" +
-            ("0" + parseInt(result[1], 10).toString(16)).slice(-2) +
-            ("0" + parseInt(result[2], 10).toString(16)).slice(-2) +
-            ("0" + parseInt(result[3], 10).toString(16)).slice(-2);
-    }
-    
-    return rgb; // fallback
-};
+// const rgbToHex = (rgb: string) => {
+//     if (typeof rgb !== 'string') {
+//         return '#ffffff';
+//     }
+//     if (rgb.startsWith('#')) return rgb;
+//
+//     const el = document.createElement('div');
+//     el.style.color = rgb;
+//     document.body.appendChild(el);
+//     const computedColor = window.getComputedStyle(el).color;
+//     document.body.removeChild(el);
+//     
+//     const result = /^rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(computedColor);
+//     if (result) {
+//         return "#" +
+//             ("0" + parseInt(result[1], 10).toString(16)).slice(-2) +
+//             ("0" + parseInt(result[2], 10).toString(16)).slice(-2) +
+//             ("0" + parseInt(result[3], 10).toString(16)).slice(-2);
+//     }
+//     
+//     return rgb; // fallback
+// };
 
 const TokenReference = () => {
   const tokenGroups = [
@@ -2581,7 +2574,7 @@ const App = () => {
     x: number;
     y: number;
     width: number;
-    height: number | string;
+    height: number;
   }>({
     x: 50,
     y: 50,
@@ -2711,7 +2704,7 @@ const App = () => {
                   if (heightInfo.sizingType === 'pixels' && heightInfo.pixels) {
                       newHeight = heightInfo.pixels;
                   } else if (heightInfo.sizingType === 'content') {
-                      newHeight = 'auto';
+                      newHeight = 400; // A reasonable default for 'content' sizing in the playground
                   }
               }
 
