@@ -1,11 +1,11 @@
-import React, { useState, CSSProperties, ReactNode } from 'react';
+import React, { useState, CSSProperties, ReactNode, useRef, useEffect } from 'react';
 import { Rnd, DraggableData, ResizableDelta, Position } from 'react-rnd';
 
-interface ContainerState {
+export interface ContainerState {
   x: number;
   y: number;
   width: number;
-  height: number;
+  height: number | 'auto';
 }
 
 interface ResizableSliderProps {
@@ -16,6 +16,30 @@ interface ResizableSliderProps {
 
 const ResizableSlider: React.FC<ResizableSliderProps> = ({ children, containerState, onContainerChange }) => {
   const [isEditing, setIsEditing] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [measuredHeight, setMeasuredHeight] = useState<number>(400);
+
+  // Measure content height when height is 'auto'
+  useEffect(() => {
+    if (containerState.height === 'auto' && contentRef.current) {
+      const measureHeight = () => {
+        if (contentRef.current) {
+          const height = contentRef.current.scrollHeight;
+          setMeasuredHeight(height);
+        }
+      };
+      
+      measureHeight();
+      
+      // Re-measure on content changes
+      const resizeObserver = new ResizeObserver(measureHeight);
+      resizeObserver.observe(contentRef.current);
+      
+      return () => resizeObserver.disconnect();
+    } else if (typeof containerState.height === 'number') {
+      setMeasuredHeight(containerState.height);
+    }
+  }, [containerState.height, children]);
 
   const handleKnobClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -24,6 +48,9 @@ const ResizableSlider: React.FC<ResizableSliderProps> = ({ children, containerSt
 
   const knobSize = 24;
   const borderWidth = isEditing ? 2 : 1;
+  
+  // Use measured height for Rnd when height is 'auto', otherwise use the numeric value
+  const rndHeight = containerState.height === 'auto' ? measuredHeight : containerState.height;
 
   const styles: { [key: string]: CSSProperties } = {
     container: {
@@ -61,7 +88,7 @@ const ResizableSlider: React.FC<ResizableSliderProps> = ({ children, containerSt
     },
     sliderContainer: {
       width: '100%',
-      height: '100%',
+      height: containerState.height === 'auto' ? 'auto' : '100%',
       opacity: isEditing ? 0.8 : 1,
       transition: 'opacity 0.3s ease',
     }
@@ -69,16 +96,17 @@ const ResizableSlider: React.FC<ResizableSliderProps> = ({ children, containerSt
 
   return (
     <Rnd
-      size={{ width: containerState.width, height: containerState.height }}
+      size={{ width: containerState.width, height: rndHeight }}
       position={{ x: containerState.x, y: containerState.y }}
       onDrag={(_e, d: DraggableData) => {
         onContainerChange(prev => ({ ...prev, x: d.x, y: d.y }));
       }}
       onResize={(_e, _direction, ref: HTMLElement, _delta: ResizableDelta, position: Position) => {
+        // When user resizes, convert 'auto' to actual pixel value
         onContainerChange(prev => ({
           ...prev,
           width: ref.offsetWidth,
-          height: ref.offsetHeight,
+          height: ref.offsetHeight, // Convert 'auto' to number when resized
           x: position.x,
           y: position.y
         }));
@@ -96,7 +124,7 @@ const ResizableSlider: React.FC<ResizableSliderProps> = ({ children, containerSt
       <div className="drag-handle" style={{...styles.knob, cursor: isEditing ? 'move' : 'pointer'}} onClick={handleKnobClick}>
         <div style={styles.knobIcon} />
       </div>
-      <div style={styles.sliderContainer}>
+      <div ref={contentRef} style={styles.sliderContainer}>
         {children}
       </div>
     </Rnd>

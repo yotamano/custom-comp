@@ -8,7 +8,7 @@ import 'prismjs/themes/prism.css';
 import { transform } from '@babel/standalone';
 import type { TransformOptions } from '@babel/core';
 
-import ResizableSlider from './ResizableSlider';
+import ResizableSlider, { ContainerState } from './ResizableSlider';
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
     constructor(props: { children: React.ReactNode }) {
@@ -2558,6 +2558,7 @@ const App = () => {
   const [selectedElementPath, setSelectedElementPath] = useState<string[] | null>(null);
   const [isSelectionModeEnabled, setIsSelectionModeEnabled] = useState(false);
   const [collapsedNodes, setCollapsedNodes] = useState<{ [key: string]: boolean }>({});
+  const [copiedSection, setCopiedSection] = useState<string | null>(null);
   const componentContainerRef = useRef<HTMLDivElement>(null);
   const componentPreviewAreaRef = useRef<HTMLDivElement>(null);
 
@@ -2570,12 +2571,7 @@ const App = () => {
     error: null,
   });
 
-  const [containerState, setContainerState] = useState<{
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  }>({
+  const [containerState, setContainerState] = useState<ContainerState>({
     x: 50,
     y: 50,
     width: 500,
@@ -2704,7 +2700,7 @@ const App = () => {
                   if (heightInfo.sizingType === 'pixels' && heightInfo.pixels) {
                       newHeight = heightInfo.pixels;
                   } else if (heightInfo.sizingType === 'content') {
-                      newHeight = 400; // A reasonable default for 'content' sizing in the playground
+                      newHeight = 'auto'; // Use 'auto' for content-based sizing
                   }
               }
 
@@ -2906,6 +2902,16 @@ const App = () => {
 
   const handleToggleNode = (path: string) => {
     setCollapsedNodes(prev => ({ ...prev, [path]: !prev[path] }));
+  };
+
+  const handleCopy = async (text: string, section: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedSection(section);
+      setTimeout(() => setCopiedSection(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
   };
 
   const renderComponent = () => {
@@ -3417,13 +3423,52 @@ const App = () => {
                         border: '1px solid rgba(0, 0, 0, 0.06)'
                       }}>
                         <div 
-                          onClick={() => setDetailsCollapsedSections(prev => ({ ...prev, prompt: !prev.prompt }))}
-                          style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', marginBottom: '8px' }}
+                          style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', justifyContent: 'space-between' }}
                         >
-                          <span style={{ marginRight: '6px', fontSize: '10px', color: '#71717a', width: '10px' }}>
-                            {detailsCollapsedSections.prompt ? '▸' : '▾'}
-                          </span>
-                          <h3 style={{ margin: 0, fontSize: '11px', fontWeight: '600', color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Prompt</h3>
+                          <div 
+                            onClick={() => setDetailsCollapsedSections(prev => ({ ...prev, prompt: !prev.prompt }))}
+                            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', flex: 1 }}
+                          >
+                            <span style={{ marginRight: '6px', fontSize: '10px', color: '#71717a', width: '10px' }}>
+                              {detailsCollapsedSections.prompt ? '▸' : '▾'}
+                            </span>
+                            <h3 style={{ margin: 0, fontSize: '11px', fontWeight: '600', color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Prompt</h3>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCopy(csvResults[currentCSVIndex].prompt, 'prompt');
+                            }}
+                            style={{
+                              padding: '6px',
+                              fontSize: '10px',
+                              background: copiedSection === 'prompt' ? '#16a34a' : 'transparent',
+                              color: copiedSection === 'prompt' ? '#ffffff' : '#71717a',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '24px',
+                              height: '24px',
+                            }}
+                            title={copiedSection === 'prompt' ? 'Copied!' : 'Copy'}
+                            onMouseEnter={(e) => { if (copiedSection !== 'prompt') e.currentTarget.style.background = '#f4f4f5'; }}
+                            onMouseLeave={(e) => { if (copiedSection !== 'prompt') e.currentTarget.style.background = 'transparent'; }}
+                          >
+                            {copiedSection === 'prompt' ? (
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12"/>
+                              </svg>
+                            ) : (
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                              </svg>
+                            )}
+                          </button>
                         </div>
                         {!detailsCollapsedSections.prompt && (
                           <>
@@ -3454,28 +3499,166 @@ const App = () => {
                   )}
                   <div style={{ marginBottom: '16px' }}>
                     <div 
-                      onClick={() => setDetailsCollapsedSections(prev => ({ ...prev, brief: !prev.brief }))}
-                      style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', marginBottom: '8px' }}
+                      style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', justifyContent: 'space-between' }}
                     >
-                      <span style={{ marginRight: '6px', fontSize: '10px', color: '#71717a', width: '10px' }}>
-                        {detailsCollapsedSections.brief ? '▸' : '▾'}
-                      </span>
-                      <h3 style={{ margin: 0, fontSize: '11px', fontWeight: '600', color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Design Brief</h3>
+                      <div 
+                        onClick={() => setDetailsCollapsedSections(prev => ({ ...prev, brief: !prev.brief }))}
+                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', flex: 1 }}
+                      >
+                        <span style={{ marginRight: '6px', fontSize: '10px', color: '#71717a', width: '10px' }}>
+                          {detailsCollapsedSections.brief ? '▸' : '▾'}
+                        </span>
+                        <h3 style={{ margin: 0, fontSize: '11px', fontWeight: '600', color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Design Brief</h3>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCopy(parsedOutput.designBrief, 'brief');
+                        }}
+                        style={{
+                          padding: '6px',
+                          fontSize: '10px',
+                          background: copiedSection === 'brief' ? '#16a34a' : 'transparent',
+                          color: copiedSection === 'brief' ? '#ffffff' : '#71717a',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '24px',
+                          height: '24px',
+                        }}
+                        title={copiedSection === 'brief' ? 'Copied!' : 'Copy'}
+                        onMouseEnter={(e) => { if (copiedSection !== 'brief') e.currentTarget.style.background = '#f4f4f5'; }}
+                        onMouseLeave={(e) => { if (copiedSection !== 'brief') e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        {copiedSection === 'brief' ? (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                        ) : (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                          </svg>
+                        )}
+                      </button>
                     </div>
                     {!detailsCollapsedSections.brief && (
                       <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '11px', background: '#fafafa', padding: '12px', borderRadius: '6px', border: '1px solid rgba(0, 0, 0, 0.06)', color: '#27272a', lineHeight: '1.5', margin: '0 0 0 16px' }}>{parsedOutput.designBrief}</pre>
                     )}
                   </div>
                   <hr style={{margin: '16px 0', border: 'none', borderTop: '1px solid rgba(0, 0, 0, 0.06)'}} />
+                  <div style={{ marginBottom: '16px' }}>
+                    <div 
+                      style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', justifyContent: 'space-between' }}
+                    >
+                      <div 
+                        onClick={() => setDetailsCollapsedSections(prev => ({ ...prev, react: !prev.react }))}
+                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', flex: 1 }}
+                      >
+                        <span style={{ marginRight: '6px', fontSize: '10px', color: '#71717a', width: '10px' }}>
+                          {detailsCollapsedSections.react ? '▸' : '▾'}
+                        </span>
+                        <h3 style={{ margin: 0, fontSize: '11px', fontWeight: '600', color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>React</h3>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCopy(parsedOutput.reactCode, 'react');
+                        }}
+                        style={{
+                          padding: '6px',
+                          fontSize: '10px',
+                          background: copiedSection === 'react' ? '#16a34a' : 'transparent',
+                          color: copiedSection === 'react' ? '#ffffff' : '#71717a',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '24px',
+                          height: '24px',
+                        }}
+                        title={copiedSection === 'react' ? 'Copied!' : 'Copy'}
+                        onMouseEnter={(e) => { if (copiedSection !== 'react') e.currentTarget.style.background = '#f4f4f5'; }}
+                        onMouseLeave={(e) => { if (copiedSection !== 'react') e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        {copiedSection === 'react' ? (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                        ) : (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                    {!detailsCollapsedSections.react && (
+                      <pre style={{ whiteSpace: 'pre-wrap', fontFamily: '"Fira Code", "SF Mono", Monaco, monospace', fontSize: '11px', background: '#fafafa', padding: '12px', borderRadius: '6px', border: '1px solid rgba(0, 0, 0, 0.06)', lineHeight: '1.5', margin: '0 0 0 16px', overflowX: 'auto' }}>
+                        <code 
+                          dangerouslySetInnerHTML={{ 
+                            __html: Prism.highlight(parsedOutput.reactCode, Prism.languages.jsx, 'jsx') 
+                          }}
+                        />
+                      </pre>
+                    )}
+                  </div>
+                  <hr style={{margin: '16px 0', border: 'none', borderTop: '1px solid rgba(0, 0, 0, 0.06)'}} />
                   <div>
                     <div 
-                      onClick={() => setDetailsCollapsedSections(prev => ({ ...prev, manifest: !prev.manifest }))}
-                      style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', marginBottom: '8px' }}
+                      style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', justifyContent: 'space-between' }}
                     >
-                      <span style={{ marginRight: '6px', fontSize: '10px', color: '#71717a', width: '10px' }}>
-                        {detailsCollapsedSections.manifest ? '▸' : '▾'}
-                      </span>
-                      <h3 style={{ margin: 0, fontSize: '11px', fontWeight: '600', color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Manifest</h3>
+                      <div 
+                        onClick={() => setDetailsCollapsedSections(prev => ({ ...prev, manifest: !prev.manifest }))}
+                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', flex: 1 }}
+                      >
+                        <span style={{ marginRight: '6px', fontSize: '10px', color: '#71717a', width: '10px' }}>
+                          {detailsCollapsedSections.manifest ? '▸' : '▾'}
+                        </span>
+                        <h3 style={{ margin: 0, fontSize: '11px', fontWeight: '600', color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Manifest</h3>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCopy(parsedOutput.manifest, 'manifest');
+                        }}
+                        style={{
+                          padding: '6px',
+                          fontSize: '10px',
+                          background: copiedSection === 'manifest' ? '#16a34a' : 'transparent',
+                          color: copiedSection === 'manifest' ? '#ffffff' : '#71717a',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '24px',
+                          height: '24px',
+                        }}
+                        title={copiedSection === 'manifest' ? 'Copied!' : 'Copy'}
+                        onMouseEnter={(e) => { if (copiedSection !== 'manifest') e.currentTarget.style.background = '#f4f4f5'; }}
+                        onMouseLeave={(e) => { if (copiedSection !== 'manifest') e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        {copiedSection === 'manifest' ? (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                        ) : (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                          </svg>
+                        )}
+                      </button>
                     </div>
                     {!detailsCollapsedSections.manifest && (
                       <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '11px', background: '#fafafa', padding: '12px', borderRadius: '6px', border: '1px solid rgba(0, 0, 0, 0.06)', color: '#27272a', lineHeight: '1.5', margin: '0 0 0 16px' }}>{parsedOutput.manifest}</pre>
