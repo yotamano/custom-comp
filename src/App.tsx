@@ -3246,37 +3246,37 @@ const App = () => {
                   {showCSVTooltip && lastCSVInfo.exists && (
                     <div style={{
                       position: 'absolute',
-                      bottom: 'calc(100% + 8px)',
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      padding: '6px 10px',
+                      right: 'calc(100% + 8px)',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      padding: '4px 8px',
                       background: '#09090b',
                       color: '#ffffff',
-                      fontSize: '11px',
-                      borderRadius: '6px',
+                      fontSize: '10px',
+                      borderRadius: '4px',
                       whiteSpace: 'nowrap',
                       zIndex: 1000,
-                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
                       pointerEvents: 'none',
                       animation: 'fadeIn 0.1s ease-in',
-                      lineHeight: '1.4',
+                      lineHeight: '1.3',
                     }}>
-                      <div style={{ fontWeight: '500' }}>Load last CSV</div>
+                      <div style={{ fontWeight: '500', fontSize: '10px' }}>Load last CSV</div>
                       {lastCSVInfo.lastModified && (
-                        <div style={{ fontSize: '10px', color: '#a1a1aa', marginTop: '2px' }}>
-                          Created: {lastCSVInfo.lastModified}
+                        <div style={{ fontSize: '9px', color: '#a1a1aa', marginTop: '1px' }}>
+                          {lastCSVInfo.lastModified}
                         </div>
                       )}
                       <div style={{
                         position: 'absolute',
-                        bottom: '-4px',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
+                        right: '-4px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
                         width: '0',
                         height: '0',
-                        borderLeft: '4px solid transparent',
-                        borderRight: '4px solid transparent',
-                        borderTop: '4px solid #09090b',
+                        borderTop: '4px solid transparent',
+                        borderBottom: '4px solid transparent',
+                        borderLeft: '4px solid #09090b',
                       }} />
                     </div>
                   )}
