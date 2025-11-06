@@ -2581,6 +2581,44 @@ const App = () => {
   const [csvResults, setCsvResults] = useState<CSVResult[]>([]);
   const [currentCSVIndex, setCurrentCSVIndex] = useState(0);
   const [isCSVMode, setIsCSVMode] = useState(false);
+  const [lastCSVInfo, setLastCSVInfo] = useState<{ exists: boolean; lastModified?: string }>({ exists: false });
+  const [showCSVTooltip, setShowCSVTooltip] = useState(false);
+
+  // Check if last CSV file exists and get its metadata on mount
+  useEffect(() => {
+    const checkLastCSV = async () => {
+      try {
+        const basePath = '/custom-comp/';
+        const folderPath = `${basePath}last-output-testset/`;
+        const possibleFiles = [
+          'prompt-3-Custom Component (updated)-5.2.0.csv',
+          'latest.csv',
+        ];
+        
+        for (const filename of possibleFiles) {
+          try {
+            const csvPath = `${folderPath}${filename}`;
+            const response = await fetch(csvPath, { method: 'HEAD' });
+            if (response.ok) {
+              const lastModified = response.headers.get('last-modified');
+              setLastCSVInfo({ 
+                exists: true, 
+                lastModified: lastModified ? new Date(lastModified).toLocaleString() : undefined 
+              });
+              return;
+            }
+          } catch (error) {
+            continue;
+          }
+        }
+        setLastCSVInfo({ exists: false });
+      } catch (error) {
+        setLastCSVInfo({ exists: false });
+      }
+    };
+    
+    checkLastCSV();
+  }, []);
 
   useEffect(() => {
     const centerComponent = () => {
@@ -3158,10 +3196,91 @@ const App = () => {
           </button>
         </div>
         
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
           {selectedComponent === 'generated' && (
             <>
-              <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ position: 'relative', display: 'inline-block' }}>
+                  <button
+                    onClick={handleLoadLastCSV}
+                    disabled={!lastCSVInfo.exists}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0',
+                      borderRadius: '6px',
+                      background: '#ffffff',
+                      color: lastCSVInfo.exists ? '#09090b' : '#d4d4d8',
+                      cursor: lastCSVInfo.exists ? 'pointer' : 'not-allowed',
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      transition: 'all 0.15s ease',
+                      border: '1px solid rgba(0, 0, 0, 0.08)',
+                      height: '32px',
+                      width: '32px',
+                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                    }}
+                    onMouseEnter={(e) => { 
+                      if (lastCSVInfo.exists) {
+                        setShowCSVTooltip(true);
+                        const target = e.currentTarget; 
+                        target.style.background = '#f4f4f5'; 
+                        target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)'; 
+                      }
+                    }}
+                    onMouseLeave={(e) => { 
+                      setShowCSVTooltip(false);
+                      if (lastCSVInfo.exists) {
+                        const target = e.currentTarget; 
+                        target.style.background = '#ffffff'; 
+                        target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)'; 
+                      }
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"/>
+                      <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                  </button>
+                  {showCSVTooltip && lastCSVInfo.exists && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: 'calc(100% + 8px)',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      padding: '6px 10px',
+                      background: '#09090b',
+                      color: '#ffffff',
+                      fontSize: '11px',
+                      borderRadius: '6px',
+                      whiteSpace: 'nowrap',
+                      zIndex: 1000,
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                      pointerEvents: 'none',
+                      animation: 'fadeIn 0.1s ease-in',
+                      lineHeight: '1.4',
+                    }}>
+                      <div style={{ fontWeight: '500' }}>Load last CSV</div>
+                      {lastCSVInfo.lastModified && (
+                        <div style={{ fontSize: '10px', color: '#a1a1aa', marginTop: '2px' }}>
+                          Created: {lastCSVInfo.lastModified}
+                        </div>
+                      )}
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '-4px',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        width: '0',
+                        height: '0',
+                        borderLeft: '4px solid transparent',
+                        borderRight: '4px solid transparent',
+                        borderTop: '4px solid #09090b',
+                      }} />
+                    </div>
+                  )}
+                </div>
                 <input
                   type="file"
                   accept=".csv"
@@ -3192,34 +3311,6 @@ const App = () => {
                   <span style={{ marginRight: '6px' }}>📁</span>
                   Upload CSV
                 </label>
-                <button
-                  onClick={handleLoadLastCSV}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    background: '#ffffff',
-                    color: '#09090b',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    transition: 'all 0.15s ease',
-                    border: '1px solid rgba(0, 0, 0, 0.08)',
-                    height: '32px',
-                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-                  }}
-                  onMouseEnter={(e) => { const target = e.currentTarget; target.style.background = '#f4f4f5'; target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)'; }}
-                  onMouseLeave={(e) => { const target = e.currentTarget; target.style.background = '#ffffff'; target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)'; }}
-                  title="Load last generated CSV"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="17 8 12 3 7 8"/>
-                    <line x1="12" y1="3" x2="12" y2="15"/>
-                  </svg>
-                  Load Last CSV
-                </button>
                 {isCSVMode && csvResults.length > 0 && (
                   <button
                     onClick={() => {
