@@ -2559,6 +2559,9 @@ const App = () => {
   const [isSelectionModeEnabled, setIsSelectionModeEnabled] = useState(false);
   const [collapsedNodes, setCollapsedNodes] = useState<{ [key: string]: boolean }>({});
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
+  const [editingSection, setEditingSection] = useState<'react' | 'manifest' | null>(null);
+  const [editedReactCode, setEditedReactCode] = useState<string>('');
+  const [editedManifest, setEditedManifest] = useState<string>('');
   const componentContainerRef = useRef<HTMLDivElement>(null);
   const componentPreviewAreaRef = useRef<HTMLDivElement>(null);
 
@@ -3736,50 +3739,153 @@ const App = () => {
                         </span>
                         <h3 style={{ margin: 0, fontSize: '11px', fontWeight: '600', color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>React</h3>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCopy(parsedOutput.reactCode, 'react');
-                        }}
-                        style={{
-                          padding: '6px',
-                          fontSize: '10px',
-                          background: copiedSection === 'react' ? '#16a34a' : 'transparent',
-                          color: copiedSection === 'react' ? '#ffffff' : '#71717a',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: '24px',
-                          height: '24px',
-                        }}
-                        title={copiedSection === 'react' ? 'Copied!' : 'Copy'}
-                        onMouseEnter={(e) => { if (copiedSection !== 'react') e.currentTarget.style.background = '#f4f4f5'; }}
-                        onMouseLeave={(e) => { if (copiedSection !== 'react') e.currentTarget.style.background = 'transparent'; }}
-                      >
-                        {copiedSection === 'react' ? (
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12"/>
-                          </svg>
-                        ) : (
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                          </svg>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (editingSection === 'react') {
+                              // Save changes and recompile
+                              const { component, error } = compileCode(editedReactCode);
+                              setParsedOutput(prev => ({ 
+                                ...prev, 
+                                reactCode: editedReactCode,
+                                component,
+                                error
+                              }));
+                              setEditingSection(null);
+                            } else {
+                              // Start editing
+                              setEditedReactCode(parsedOutput.reactCode);
+                              setEditingSection('react');
+                            }
+                          }}
+                          style={{
+                            padding: '6px',
+                            fontSize: '10px',
+                            background: editingSection === 'react' ? '#16a34a' : 'transparent',
+                            color: editingSection === 'react' ? '#ffffff' : '#71717a',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '24px',
+                            height: '24px',
+                          }}
+                          title={editingSection === 'react' ? 'Save' : 'Edit'}
+                          onMouseEnter={(e) => { if (editingSection !== 'react') e.currentTarget.style.background = '#f4f4f5'; }}
+                          onMouseLeave={(e) => { if (editingSection !== 'react') e.currentTarget.style.background = 'transparent'; }}
+                        >
+                          {editingSection === 'react' ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                          ) : (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                            </svg>
+                          )}
+                        </button>
+                        {editingSection === 'react' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingSection(null);
+                            }}
+                            style={{
+                              padding: '6px',
+                              fontSize: '10px',
+                              background: 'transparent',
+                              color: '#71717a',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '24px',
+                              height: '24px',
+                            }}
+                            title="Cancel"
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#f4f4f5'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="18" y1="6" x2="6" y2="18"/>
+                              <line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                          </button>
                         )}
-                      </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopy(parsedOutput.reactCode, 'react');
+                          }}
+                          style={{
+                            padding: '6px',
+                            fontSize: '10px',
+                            background: copiedSection === 'react' ? '#16a34a' : 'transparent',
+                            color: copiedSection === 'react' ? '#ffffff' : '#71717a',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '24px',
+                            height: '24px',
+                          }}
+                          title={copiedSection === 'react' ? 'Copied!' : 'Copy'}
+                          onMouseEnter={(e) => { if (copiedSection !== 'react') e.currentTarget.style.background = '#f4f4f5'; }}
+                          onMouseLeave={(e) => { if (copiedSection !== 'react') e.currentTarget.style.background = 'transparent'; }}
+                        >
+                          {copiedSection === 'react' ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                          ) : (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                            </svg>
+                          )}
+                        </button>
+                      </div>
                     </div>
                     {!detailsCollapsedSections.react && (
-                      <pre style={{ whiteSpace: 'pre-wrap', fontFamily: '"Fira Code", "SF Mono", Monaco, monospace', fontSize: '11px', background: '#fafafa', padding: '12px', borderRadius: '6px', border: '1px solid rgba(0, 0, 0, 0.06)', lineHeight: '1.5', margin: '0 0 0 16px', overflowX: 'auto' }}>
-                        <code 
-                          dangerouslySetInnerHTML={{ 
-                            __html: Prism.highlight(parsedOutput.reactCode, Prism.languages.jsx, 'jsx') 
+                      editingSection === 'react' ? (
+                        <textarea
+                          value={editedReactCode}
+                          onChange={(e) => setEditedReactCode(e.target.value)}
+                          style={{
+                            width: '100%',
+                            minHeight: '400px',
+                            fontFamily: '"Fira Code", "SF Mono", Monaco, monospace',
+                            fontSize: '11px',
+                            background: '#fafafa',
+                            padding: '12px',
+                            borderRadius: '6px',
+                            border: '1px solid rgba(0, 0, 0, 0.06)',
+                            lineHeight: '1.5',
+                            margin: '0 0 0 16px',
+                            resize: 'vertical',
+                            outline: 'none',
+                            color: '#27272a'
                           }}
                         />
-                      </pre>
+                      ) : (
+                        <pre style={{ whiteSpace: 'pre-wrap', fontFamily: '"Fira Code", "SF Mono", Monaco, monospace', fontSize: '11px', background: '#fafafa', padding: '12px', borderRadius: '6px', border: '1px solid rgba(0, 0, 0, 0.06)', lineHeight: '1.5', margin: '0 0 0 16px', overflowX: 'auto' }}>
+                          <code 
+                            dangerouslySetInnerHTML={{ 
+                              __html: Prism.highlight(parsedOutput.reactCode, Prism.languages.jsx, 'jsx') 
+                            }}
+                          />
+                        </pre>
+                      )
                     )}
                   </div>
                   <hr style={{margin: '16px 0', border: 'none', borderTop: '1px solid rgba(0, 0, 0, 0.06)'}} />
@@ -3796,44 +3902,148 @@ const App = () => {
                         </span>
                         <h3 style={{ margin: 0, fontSize: '11px', fontWeight: '600', color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Manifest</h3>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCopy(parsedOutput.manifest, 'manifest');
-                        }}
-                        style={{
-                          padding: '6px',
-                          fontSize: '10px',
-                          background: copiedSection === 'manifest' ? '#16a34a' : 'transparent',
-                          color: copiedSection === 'manifest' ? '#ffffff' : '#71717a',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: '24px',
-                          height: '24px',
-                        }}
-                        title={copiedSection === 'manifest' ? 'Copied!' : 'Copy'}
-                        onMouseEnter={(e) => { if (copiedSection !== 'manifest') e.currentTarget.style.background = '#f4f4f5'; }}
-                        onMouseLeave={(e) => { if (copiedSection !== 'manifest') e.currentTarget.style.background = 'transparent'; }}
-                      >
-                        {copiedSection === 'manifest' ? (
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12"/>
-                          </svg>
-                        ) : (
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                          </svg>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (editingSection === 'manifest') {
+                              // Save changes and re-parse manifest
+                              setParsedOutput(prev => ({ ...prev, manifest: editedManifest }));
+                              try {
+                                const parsedManifest = JSON.parse(editedManifest);
+                                setManifestJson(parsedManifest);
+                              } catch (e) {
+                                console.error("Failed to parse manifest JSON:", e);
+                                // Still save it even if parsing fails
+                              }
+                              setEditingSection(null);
+                            } else {
+                              // Start editing
+                              setEditedManifest(parsedOutput.manifest);
+                              setEditingSection('manifest');
+                            }
+                          }}
+                          style={{
+                            padding: '6px',
+                            fontSize: '10px',
+                            background: editingSection === 'manifest' ? '#16a34a' : 'transparent',
+                            color: editingSection === 'manifest' ? '#ffffff' : '#71717a',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '24px',
+                            height: '24px',
+                          }}
+                          title={editingSection === 'manifest' ? 'Save' : 'Edit'}
+                          onMouseEnter={(e) => { if (editingSection !== 'manifest') e.currentTarget.style.background = '#f4f4f5'; }}
+                          onMouseLeave={(e) => { if (editingSection !== 'manifest') e.currentTarget.style.background = 'transparent'; }}
+                        >
+                          {editingSection === 'manifest' ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                          ) : (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                            </svg>
+                          )}
+                        </button>
+                        {editingSection === 'manifest' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingSection(null);
+                            }}
+                            style={{
+                              padding: '6px',
+                              fontSize: '10px',
+                              background: 'transparent',
+                              color: '#71717a',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '24px',
+                              height: '24px',
+                            }}
+                            title="Cancel"
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#f4f4f5'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="18" y1="6" x2="6" y2="18"/>
+                              <line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                          </button>
                         )}
-                      </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopy(parsedOutput.manifest, 'manifest');
+                          }}
+                          style={{
+                            padding: '6px',
+                            fontSize: '10px',
+                            background: copiedSection === 'manifest' ? '#16a34a' : 'transparent',
+                            color: copiedSection === 'manifest' ? '#ffffff' : '#71717a',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '24px',
+                            height: '24px',
+                          }}
+                          title={copiedSection === 'manifest' ? 'Copied!' : 'Copy'}
+                          onMouseEnter={(e) => { if (copiedSection !== 'manifest') e.currentTarget.style.background = '#f4f4f5'; }}
+                          onMouseLeave={(e) => { if (copiedSection !== 'manifest') e.currentTarget.style.background = 'transparent'; }}
+                        >
+                          {copiedSection === 'manifest' ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                          ) : (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                            </svg>
+                          )}
+                        </button>
+                      </div>
                     </div>
                     {!detailsCollapsedSections.manifest && (
-                      <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '11px', background: '#fafafa', padding: '12px', borderRadius: '6px', border: '1px solid rgba(0, 0, 0, 0.06)', color: '#27272a', lineHeight: '1.5', margin: '0 0 0 16px' }}>{parsedOutput.manifest}</pre>
+                      editingSection === 'manifest' ? (
+                        <textarea
+                          value={editedManifest}
+                          onChange={(e) => setEditedManifest(e.target.value)}
+                          style={{
+                            width: '100%',
+                            minHeight: '400px',
+                            fontFamily: 'monospace',
+                            fontSize: '11px',
+                            background: '#fafafa',
+                            padding: '12px',
+                            borderRadius: '6px',
+                            border: '1px solid rgba(0, 0, 0, 0.06)',
+                            color: '#27272a',
+                            lineHeight: '1.5',
+                            margin: '0 0 0 16px',
+                            resize: 'vertical',
+                            outline: 'none'
+                          }}
+                        />
+                      ) : (
+                        <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '11px', background: '#fafafa', padding: '12px', borderRadius: '6px', border: '1px solid rgba(0, 0, 0, 0.06)', color: '#27272a', lineHeight: '1.5', margin: '0 0 0 16px' }}>{parsedOutput.manifest}</pre>
+                      )
                     )}
                   </div>
                   </div>
