@@ -2562,6 +2562,10 @@ const App = () => {
   const [editingSection, setEditingSection] = useState<'react' | 'manifest' | null>(null);
   const [editedReactCode, setEditedReactCode] = useState<string>('');
   const [editedManifest, setEditedManifest] = useState<string>('');
+  const [detailsPanelWidth, setDetailsPanelWidth] = useState(360);
+  const [propertiesPanelWidth, setPropertiesPanelWidth] = useState(360);
+  const [isResizingDetailsPanel, setIsResizingDetailsPanel] = useState(false);
+  const [isResizingPropertiesPanel, setIsResizingPropertiesPanel] = useState(false);
   const componentContainerRef = useRef<HTMLDivElement>(null);
   const componentPreviewAreaRef = useRef<HTMLDivElement>(null);
 
@@ -2879,6 +2883,42 @@ const App = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isCSVMode, csvResults.length, currentCSVIndex]);
+
+  // Handle panel resizing
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isResizingDetailsPanel) {
+        const newWidth = e.clientX - 16; // 16px is the left offset
+        if (newWidth >= 280 && newWidth <= 800) {
+          setDetailsPanelWidth(newWidth);
+        }
+      } else if (isResizingPropertiesPanel) {
+        const newWidth = window.innerWidth - e.clientX - 16; // 16px is the right offset
+        if (newWidth >= 280 && newWidth <= 800) {
+          setPropertiesPanelWidth(newWidth);
+        }
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingDetailsPanel(false);
+      setIsResizingPropertiesPanel(false);
+    };
+
+    if (isResizingDetailsPanel || isResizingPropertiesPanel) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'ew-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizingDetailsPanel, isResizingPropertiesPanel]);
 
   const handleCSVUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -3532,7 +3572,7 @@ const App = () => {
                   position: 'absolute',
                   top: '16px',
                   left: '16px',
-                  width: '360px',
+                  width: `${detailsPanelWidth}px`,
                   height: 'calc(100% - 32px)',
                   maxHeight: 'calc(100% - 32px)',
                   background: '#ffffff',
@@ -3542,11 +3582,27 @@ const App = () => {
                   border: '1px solid rgba(0, 0, 0, 0.08)',
                   boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04)',
                   zIndex: 100,
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  transition: isResizingDetailsPanel ? 'none' : 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                   display: 'flex',
                   flexDirection: 'column',
                   animation: 'slideInLeft 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 }}>
+                  {/* Resize Handle */}
+                  <div
+                    onMouseDown={() => setIsResizingDetailsPanel(true)}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      right: 0,
+                      width: '8px',
+                      height: '100%',
+                      cursor: 'ew-resize',
+                      zIndex: 101,
+                      background: 'transparent',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  />
                   <div style={{ 
                     display: 'flex', 
                     justifyContent: 'space-between', 
@@ -4056,7 +4112,7 @@ const App = () => {
                   position: 'absolute',
                   top: '16px',
                   right: '16px',
-                  width: '360px',
+                  width: `${propertiesPanelWidth}px`,
                   height: 'calc(100% - 32px)',
                   maxHeight: 'calc(100% - 32px)',
                   background: '#ffffff',
@@ -4066,11 +4122,27 @@ const App = () => {
                   border: '1px solid rgba(0, 0, 0, 0.08)',
                   boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04)',
                   zIndex: 100,
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  transition: isResizingPropertiesPanel ? 'none' : 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                   display: 'flex',
                   flexDirection: 'column',
                   animation: 'slideInRight 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 }}>
+                  {/* Resize Handle */}
+                  <div
+                    onMouseDown={() => setIsResizingPropertiesPanel(true)}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '8px',
+                      height: '100%',
+                      cursor: 'ew-resize',
+                      zIndex: 101,
+                      background: 'transparent',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  />
                   <div style={{ 
                     display: 'flex', 
                     justifyContent: 'space-between', 
