@@ -412,3 +412,5 @@ const Hero: React.FC<HeroSectionProps> = ({ elementProps }) => {
 
 Everything else is handled automatically by Wix and the playground! 🎉
 
+
+

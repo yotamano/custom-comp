@@ -1,0 +1,48 @@
+structure:
+  - path: systemPrompt/role.md
+
+  - path: systemPrompt/design-guidelines.md
+
+  - path: systemPrompt/core-documentation.md
+
+  - wrapperTag: component-manifest
+    children:
+      - path: docs/intro.md
+        wrapperTag: intro
+      - path: docs/editorElement.md
+        wrapperTag: editorElement
+      - path: docs/layout.md
+        wrapperTag: layout
+      - path: docs/css-properties.md
+        wrapperTag: css-properties
+      - path: docs/data.md
+        wrapperTag: data
+      - path: docs/elements.md
+        wrapperTag: elements
+      - path: docs/archetype.md
+        wrapperTag: archetype
+      - path: docs/installation.md
+        wrapperTag: installation
+      - path: systemPrompt/component-manifest-guidelines.md
+        wrapperTag: component-manifest-guidelines
+
+  - path: systemPrompt/component-css-guidelines.md
+    wrapperTag: component-css-guidelines
+
+  - path: systemPrompt/css-variables-guidelines.md
+    wrapperTag: css-variables-guidelines
+
+  - path: systemPrompt/component-react-guidelines.md
+    wrapperTag: component-react-guidelines
+
+  - path: systemPrompt/component-assets-guidelines.md
+    wrapperTag: component-assets-guidelines
+
+  - path: systemPrompt/wix-component-example.md
+    wrapperTag: wix-component-example
+
+  - path: systemPrompt/response-format.md
+    wrapperTag: response-format
+
+  - path: systemPrompt/verification.md
+    wrapperTag: verification

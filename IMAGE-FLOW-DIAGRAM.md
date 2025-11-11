@@ -384,3 +384,5 @@ The image system works end-to-end in the playground. The missing XML tags don't 
 
 The XML tags are likely for a **separate image generation pipeline** that processes test results to create actual images, which isn't part of the playground's concern.
 
+
+
