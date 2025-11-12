@@ -2597,28 +2597,20 @@ const App = () => {
       try {
         // Use different base path for dev vs production
         const basePath = import.meta.env.DEV ? '/' : '/custom-comp/';
-        const folderPath = `${basePath}last-output-testset/`;
-        const possibleFiles = [
-          'prompt-3-Custom Component (updated)-5.5.0.csv',
-          'prompt-3-Custom Component (updated)-5.4.0.csv',
-          'prompt-3-Custom Component (updated)-5.2.0.csv',
-          'latest.csv',
-        ];
+        const manifestPath = `${basePath}last-output-testset/manifest.json`;
         
-        for (const filename of possibleFiles) {
-          try {
-            const csvPath = `${folderPath}${filename}`;
-            const response = await fetch(csvPath, { method: 'HEAD' });
-            if (response.ok) {
-              const lastModified = response.headers.get('last-modified');
-              setLastCSVInfo({ 
-                exists: true, 
-                lastModified: lastModified ? new Date(lastModified).toLocaleString() : undefined 
-              });
-              return;
-            }
-          } catch (error) {
-            continue;
+        // Try to fetch the manifest file
+        const response = await fetch(manifestPath);
+        if (response.ok) {
+          const manifest = await response.json();
+          if (manifest.latest) {
+            setLastCSVInfo({ 
+              exists: true, 
+              lastModified: manifest.files?.[0]?.lastModified 
+                ? new Date(manifest.files[0].lastModified).toLocaleString() 
+                : undefined 
+            });
+            return;
           }
         }
         setLastCSVInfo({ exists: false });
@@ -2950,35 +2942,28 @@ const App = () => {
       const basePath = import.meta.env.DEV ? '/' : '/custom-comp/';
       const folderPath = `${basePath}last-output-testset/`;
       
-      // Try to find the CSV file - first try common filenames
-      const possibleFiles = [
-        'prompt-3-Custom Component (updated)-5.5.0.csv',
-        'prompt-3-Custom Component (updated)-5.4.0.csv',
-        'prompt-3-Custom Component (updated)-5.2.0.csv',
-        'latest.csv', // Fallback if user renames to latest.csv
-      ];
+      // First, read the manifest to find the latest CSV file
+      const manifestPath = `${folderPath}manifest.json`;
+      const manifestResponse = await fetch(manifestPath);
       
-      let csvText: string | null = null;
-      let lastError: Error | null = null;
-      
-      // Try each possible filename
-      for (const filename of possibleFiles) {
-        try {
-          const csvPath = `${folderPath}${filename}`;
-          const response = await fetch(csvPath);
-          if (response.ok) {
-            csvText = await response.text();
-            break; // Found a file, stop trying
-          }
-        } catch (error) {
-          lastError = error as Error;
-          continue; // Try next file
-        }
+      if (!manifestResponse.ok) {
+        throw new Error('Could not find manifest.json. Please run the build script.');
       }
       
-      if (!csvText) {
-        throw lastError || new Error('No CSV file found in last-output-testset folder');
+      const manifest = await manifestResponse.json();
+      if (!manifest.latest) {
+        throw new Error('No CSV files found in manifest.');
       }
+      
+      // Fetch the latest CSV file
+      const csvPath = `${folderPath}${manifest.latest}`;
+      const response = await fetch(csvPath);
+      
+      if (!response.ok) {
+        throw new Error(`Could not load ${manifest.latest}`);
+      }
+      
+      const csvText = await response.text();
       
       const results = parseCSV(csvText);
       if (results.length > 0) {
