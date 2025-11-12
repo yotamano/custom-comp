@@ -2595,9 +2595,12 @@ const App = () => {
   useEffect(() => {
     const checkLastCSV = async () => {
       try {
-        const basePath = '/custom-comp/';
+        // Use different base path for dev vs production
+        const basePath = import.meta.env.DEV ? '/' : '/custom-comp/';
         const folderPath = `${basePath}last-output-testset/`;
         const possibleFiles = [
+          'prompt-3-Custom Component (updated)-5.5.0.csv',
+          'prompt-3-Custom Component (updated)-5.4.0.csv',
           'prompt-3-Custom Component (updated)-5.2.0.csv',
           'latest.csv',
         ];
@@ -2943,12 +2946,14 @@ const App = () => {
   const handleLoadLastCSV = async () => {
     try {
       // Fetch the CSV file from the public folder
-      // Use the base path from vite config (/custom-comp/)
-      const basePath = '/custom-comp/';
+      // Use different base path for dev vs production
+      const basePath = import.meta.env.DEV ? '/' : '/custom-comp/';
       const folderPath = `${basePath}last-output-testset/`;
       
       // Try to find the CSV file - first try common filenames
       const possibleFiles = [
+        'prompt-3-Custom Component (updated)-5.5.0.csv',
+        'prompt-3-Custom Component (updated)-5.4.0.csv',
         'prompt-3-Custom Component (updated)-5.2.0.csv',
         'latest.csv', // Fallback if user renames to latest.csv
       ];
