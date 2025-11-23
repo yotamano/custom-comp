@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "prebuild": "node scripts/copy-csv.js",
+    "prebuild": "node scripts/copy-csv.cjs",
     "build": "tsc && vite build",
     "deploy": "npm run build && gh-pages -d dist",
+    "update": "bash scripts/update-and-deploy.sh",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },

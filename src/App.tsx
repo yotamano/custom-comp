@@ -822,7 +822,14 @@ const compileCode = (code: string): CompiledResult => {
       if (name === 'react') return React;
       if (name.includes('defaultImages')) {
         console.warn(`Mocking missing module '${name}' with an empty array.`);
-        return [];
+        const mock: any = [];
+        mock.defaultProductImage = {
+          src: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=60',
+          alt: 'Default Product',
+          width: 800,
+          height: 800,
+        };
+        return mock;
       }
       console.warn(`Mocking missing module '${name}' with an empty object.`);
       return {};
@@ -1600,7 +1607,7 @@ const VariablePicker: React.FC<{
 }> = ({ value, onChange, type }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [customValue, setCustomValue] = useState('');
-  const [mode, setMode] = useState<'variable' | 'custom'>('variable');
+  const [mode, setMode] = useState<'variable' | 'custom'>('custom');
   const variableName = extractVariableName(value);
   const isVariable = isCSSVariable(value);
   const computedValue = variableName ? getComputedCSSValue(variableName) : '';
@@ -1773,21 +1780,6 @@ const VariablePicker: React.FC<{
           
           <div style={{ display: 'flex', borderBottom: '1px solid rgba(0, 0, 0, 0.06)' }}>
             <button
-              onClick={() => setMode('variable')}
-              style={{
-                flex: 1,
-                padding: '6px',
-                fontSize: '10px',
-                background: mode === 'variable' ? '#fafafa' : 'transparent',
-                border: 'none',
-                borderBottom: mode === 'variable' ? '2px solid #09090b' : '2px solid transparent',
-                cursor: 'pointer',
-                fontWeight: mode === 'variable' ? '600' : '400',
-              }}
-            >
-              Variables
-            </button>
-            <button
               onClick={() => setMode('custom')}
               style={{
                 flex: 1,
@@ -1802,9 +1794,56 @@ const VariablePicker: React.FC<{
             >
               Custom
             </button>
+            <button
+              onClick={() => setMode('variable')}
+              style={{
+                flex: 1,
+                padding: '6px',
+                fontSize: '10px',
+                background: mode === 'variable' ? '#fafafa' : 'transparent',
+                border: 'none',
+                borderBottom: mode === 'variable' ? '2px solid #09090b' : '2px solid transparent',
+                cursor: 'pointer',
+                fontWeight: mode === 'variable' ? '600' : '400',
+              }}
+            >
+              Variables
+            </button>
           </div>
           
-          {mode === 'variable' ? (
+          {mode === 'custom' ? (
+            <div style={{ padding: '8px' }}>
+              <input
+                type={type === 'color' ? 'color' : 'text'}
+                value={customValue || (isVariable ? computedValue : value)}
+                onChange={(e) => setCustomValue(e.target.value)}
+                placeholder={type === 'color' ? '#000000' : 'Enter value'}
+                style={{
+                  width: '100%',
+                  padding: '6px 8px',
+                  fontSize: '11px',
+                  border: '1px solid rgba(0, 0, 0, 0.08)',
+                  borderRadius: '4px',
+                  marginBottom: '8px',
+                }}
+              />
+              <button
+                onClick={handleSetCustom}
+                style={{
+                  width: '100%',
+                  padding: '6px',
+                  fontSize: '11px',
+                  background: '#09090b',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                }}
+              >
+                Set Custom Value
+              </button>
+            </div>
+          ) : (
             <div style={{ overflowY: 'auto', maxHeight: '200px', padding: '4px' }}>
               {variables.map((varName) => (
                 <div
@@ -1860,38 +1899,6 @@ const VariablePicker: React.FC<{
                   )}
                 </div>
               ))}
-            </div>
-          ) : (
-            <div style={{ padding: '8px' }}>
-              <input
-                type={type === 'color' ? 'color' : 'text'}
-                value={customValue || (isVariable ? computedValue : value)}
-                onChange={(e) => setCustomValue(e.target.value)}
-                placeholder={type === 'color' ? '#000000' : 'Enter value'}
-                style={{
-                  width: '100%',
-                  padding: '6px 8px',
-                  fontSize: '11px',
-                  border: '1px solid rgba(0, 0, 0, 0.08)',
-                  borderRadius: '4px',
-                  marginBottom: '8px',
-                }}
-              />
-              <button
-                onClick={handleSetCustom}
-                style={{
-                  width: '100%',
-                  padding: '6px',
-                  fontSize: '11px',
-                  background: '#09090b',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                }}
-              >
-                Set Custom Value
-              </button>
             </div>
           )}
         </div>
@@ -2566,6 +2573,7 @@ const App = () => {
   const [propertiesPanelWidth, setPropertiesPanelWidth] = useState(360);
   const [isResizingDetailsPanel, setIsResizingDetailsPanel] = useState(false);
   const [isResizingPropertiesPanel, setIsResizingPropertiesPanel] = useState(false);
+  const [isManifestBindingEnabled, setIsManifestBindingEnabled] = useState(true);
   const componentContainerRef = useRef<HTMLDivElement>(null);
   const componentPreviewAreaRef = useRef<HTMLDivElement>(null);
 
@@ -2856,6 +2864,19 @@ const App = () => {
   useEffect(() => {
     if (isCSVMode && csvResults.length > 0) {
       const currentResult = csvResults[currentCSVIndex];
+      // Reset states for the new component
+      setComponentProps({});
+      setManifestJson(null);
+      setSelectedSelector(null);
+      setComponentCssProps({});
+      setParsedOutput({
+        designBrief: '',
+        reactCode: '',
+        css: '',
+        manifest: '',
+        component: null,
+        error: null,
+      });
       parseAndCompileGeneratedOutput(currentResult.generatedOutput);
     } else {
       parseAndCompileGeneratedOutput(generatedOutput);
@@ -3062,13 +3083,13 @@ const App = () => {
                     `}
                   </style>
                 )}
-                <style>{parsedOutput.css}</style>
+                <style key={isCSVMode ? csvResults[currentCSVIndex].index : generatedOutput}>{parsedOutput.css}</style>
                 <RenderedComponent 
                   {...{
                     className: "generated-component",
                     id: "generated-component-1",
                     wix: {},
-                    ...componentProps,
+                    ...(isManifestBindingEnabled ? componentProps : {}),
                   } as any}
                 />
               </div>
@@ -3492,25 +3513,47 @@ const App = () => {
                     <h3 style={{ margin: 0, fontSize: '13px', fontWeight: '600', color: '#09090b', letterSpacing: '-0.01em' }}>
                       Paste Generated Output
                     </h3>
-                    <button
-                      onClick={() => setGeneratedOutput('')}
-                      style={{
-                        padding: '5px 10px',
-                        border: '1px solid rgba(0, 0, 0, 0.08)',
-                        borderRadius: '5px',
-                        background: '#ffffff',
-                        color: '#71717a',
-                        cursor: 'pointer',
-                        fontSize: '11px',
-                        fontWeight: '500',
-                        transition: 'all 0.15s ease',
-                        height: '24px',
-                      }}
-                      onMouseEnter={(e) => { const target = e.currentTarget; target.style.background = '#fafafa'; target.style.color = '#27272a'; }}
-                      onMouseLeave={(e) => { const target = e.currentTarget; target.style.background = '#ffffff'; target.style.color = '#71717a'; }}
-                    >
-                      Clear
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => parseAndCompileGeneratedOutput(generatedOutput)}
+                        disabled={!generatedOutput}
+                        style={{
+                          padding: '5px 10px',
+                          border: '1px solid rgba(0, 0, 0, 0.08)',
+                          borderRadius: '5px',
+                          background: '#ffffff',
+                          color: generatedOutput ? '#71717a' : '#d4d4d8',
+                          cursor: generatedOutput ? 'pointer' : 'not-allowed',
+                          fontSize: '11px',
+                          fontWeight: '500',
+                          transition: 'all 0.15s ease',
+                          height: '24px',
+                        }}
+                        onMouseEnter={(e) => { if (generatedOutput) { const target = e.currentTarget; target.style.background = '#fafafa'; target.style.color = '#27272a'; } }}
+                        onMouseLeave={(e) => { if (generatedOutput) { const target = e.currentTarget; target.style.background = '#ffffff'; target.style.color = '#71717a'; } }}
+                      >
+                        Reload
+                      </button>
+                      <button
+                        onClick={() => setGeneratedOutput('')}
+                        style={{
+                          padding: '5px 10px',
+                          border: '1px solid rgba(0, 0, 0, 0.08)',
+                          borderRadius: '5px',
+                          background: '#ffffff',
+                          color: '#71717a',
+                          cursor: 'pointer',
+                          fontSize: '11px',
+                          fontWeight: '500',
+                          transition: 'all 0.15s ease',
+                          height: '24px',
+                        }}
+                        onMouseEnter={(e) => { const target = e.currentTarget; target.style.background = '#fafafa'; target.style.color = '#27272a'; }}
+                        onMouseLeave={(e) => { const target = e.currentTarget; target.style.background = '#ffffff'; target.style.color = '#71717a'; }}
+                      >
+                        Clear
+                      </button>
+                    </div>
                   </div>
                   <textarea
                     value={generatedOutput}
@@ -4144,6 +4187,42 @@ const App = () => {
                   }}>
                     <h2 style={{ margin: 0, fontSize: '13px', fontWeight: '600', color: '#09090b', letterSpacing: '-0.01em' }}>Properties</h2>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: '8px' }}>
+                      <span style={{ fontSize: '11px', color: '#71717a', fontWeight: 500 }}>
+                        {isManifestBindingEnabled ? 'Binding: On' : 'Binding: Off'}
+                      </span>
+                      <label style={{ position: 'relative', display: 'inline-block', width: '28px', height: '16px' }}>
+                        <input
+                          type="checkbox"
+                          checked={isManifestBindingEnabled}
+                          onChange={() => setIsManifestBindingEnabled(!isManifestBindingEnabled)}
+                          style={{ opacity: 0, width: 0, height: 0 }}
+                        />
+                        <span style={{
+                          position: 'absolute',
+                          cursor: 'pointer',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          backgroundColor: isManifestBindingEnabled ? '#16a34a' : '#d4d4d8',
+                          transition: '.2s',
+                          borderRadius: '16px',
+                        }}>
+                          <span style={{
+                            position: 'absolute',
+                            height: '12px',
+                            width: '12px',
+                            left: '2px',
+                            bottom: '2px',
+                            backgroundColor: 'white',
+                            transition: '.2s',
+                            borderRadius: '50%',
+                            transform: isManifestBindingEnabled ? 'translateX(12px)' : 'translateX(0)',
+                          }}></span>
+                        </span>
+                      </label>
+                    </div>
                       <button
                         onClick={() => setIsSelectionModeEnabled(!isSelectionModeEnabled)}
                         style={{
@@ -4204,19 +4283,19 @@ const App = () => {
                   }}>
                     {(() => {
                       if (!manifestJson || !manifestJson.editorElement || selectedElementPath === null) {
-                        return <p>Select an element to see its properties.</p>;
+                        return <p style={{ color: '#71717a', fontSize: '12px' }}>Select an element to see its properties.</p>;
                       }
                       
                       const node = selectedElementPath.length > 0 ? getNodeByPath(manifestJson.editorElement, selectedElementPath) : manifestJson.editorElement;
                       
                       if (!node) {
-                        return <p>Could not find the selected element in the manifest.</p>
+                        return <p style={{ color: '#71717a', fontSize: '12px' }}>Could not find the selected element in the manifest.</p>
                       }
                       
                       const nodeToRender = node.inlineElement || node;
                       
                       let propPath = ['root'];
-                      let cssPath = ['rootCss'];
+                      let cssPath = ['root'];
 
                       selectedElementPath.forEach(segment => {
                           if (segment === 'elements') {

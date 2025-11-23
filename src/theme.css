@@ -27,8 +27,8 @@
     --wst-secondary-background-color: var(--wst-shade-1-color);
     
     /* Typography - Font Families */
-    --wst-font-family-default: 'Madefor Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    --wst-font-family-display: 'Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --wst-font-family-default: 'Wix Madefor Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --wst-font-family-display: 'Wix Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --wst-font-family-heading: var(--wst-font-family-display);
     --wst-font-family-body: var(--wst-font-family-default);
     
@@ -57,25 +57,25 @@
     --wst-line-height-relaxed: 1.75;
     
     /* Typography - Composite Heading Tokens */
-    --wst-heading-1-font: 600 72px/1.1 'Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    --wst-heading-2-font: 600 36px/1.1 'Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    --wst-heading-3-font: 600 32px/1.3 'Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    --wst-heading-4-font: 600 24px/1.3 'Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    --wst-heading-5-font: 500 20px/1.4 'Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    --wst-heading-6-font: 500 16px/1.4 'Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --wst-heading-1-font: 600 72px/1.1 'Wix Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --wst-heading-2-font: 600 36px/1.1 'Wix Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --wst-heading-3-font: 600 32px/1.3 'Wix Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --wst-heading-4-font: 600 24px/1.3 'Wix Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --wst-heading-5-font: 500 20px/1.4 'Wix Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --wst-heading-6-font: 500 16px/1.4 'Wix Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     
     /* Typography - Composite Paragraph Tokens */
-    --wst-paragraph-1-font: 400 14px/1.5 'Madefor Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    --wst-paragraph-2-font: 400 14px/1.5 'Madefor Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    --wst-paragraph-3-font: 400 12px/1.5 'Madefor Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --wst-paragraph-1-font: 400 14px/1.5 'Wix Madefor Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --wst-paragraph-2-font: 400 14px/1.5 'Wix Madefor Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --wst-paragraph-3-font: 400 12px/1.5 'Wix Madefor Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     
     /* Typography - Composite Button Tokens */
-    --wst-button-primary-font: 500 14px/1.4 'Madefor Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    --wst-button-secondary-font: 500 14px/1.4 'Madefor Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    --wst-button-tertiary-font: 500 14px/1.4 'Madefor Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --wst-button-primary-font: 500 14px/1.4 'Wix Madefor Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --wst-button-secondary-font: 500 14px/1.4 'Wix Madefor Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --wst-button-tertiary-font: 500 14px/1.4 'Wix Madefor Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     
     /* Typography - Atomic Heading Tokens (for custom combinations) */
-    --wst-heading-1-font-family: 'Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --wst-heading-1-font-family: 'Wix Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --wst-heading-1-font-size: 72px;
     --wst-heading-1-font-weight: 600;
     --wst-heading-1-font-style: normal;
@@ -84,7 +84,7 @@
     --wst-heading-1-text-decoration: none;
     --wst-heading-1-text-transform: none;
     
-    --wst-heading-2-font-family: 'Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --wst-heading-2-font-family: 'Wix Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --wst-heading-2-font-size: 36px;
     --wst-heading-2-font-weight: 600;
     --wst-heading-2-font-style: normal;
@@ -93,32 +93,32 @@
     --wst-heading-2-text-decoration: none;
     --wst-heading-2-text-transform: none;
     
-    --wst-heading-3-font-family: 'Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --wst-heading-3-font-family: 'Wix Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --wst-heading-3-font-size: 32px;
     --wst-heading-3-font-weight: 600;
     --wst-heading-3-font-style: normal;
     --wst-heading-3-line-height: 1.3;
     
-    --wst-heading-4-font-family: 'Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --wst-heading-4-font-family: 'Wix Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --wst-heading-4-font-size: 24px;
     --wst-heading-4-font-weight: 600;
     --wst-heading-4-font-style: normal;
     --wst-heading-4-line-height: 1.3;
     
-    --wst-heading-5-font-family: 'Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --wst-heading-5-font-family: 'Wix Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --wst-heading-5-font-size: 20px;
     --wst-heading-5-font-weight: 500;
     --wst-heading-5-font-style: normal;
     --wst-heading-5-line-height: 1.4;
     
-    --wst-heading-6-font-family: 'Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --wst-heading-6-font-family: 'Wix Madefor Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --wst-heading-6-font-size: 16px;
     --wst-heading-6-font-weight: 500;
     --wst-heading-6-font-style: normal;
     --wst-heading-6-line-height: 1.4;
     
     /* Typography - Atomic Paragraph Tokens (for custom combinations) */
-    --wst-paragraph-1-font-family: 'Madefor Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --wst-paragraph-1-font-family: 'Wix Madefor Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --wst-paragraph-1-font-size: 14px;
     --wst-paragraph-1-font-weight: 400;
     --wst-paragraph-1-font-style: normal;
@@ -127,13 +127,13 @@
     --wst-paragraph-1-text-decoration: none;
     --wst-paragraph-1-text-transform: none;
     
-    --wst-paragraph-2-font-family: 'Madefor Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --wst-paragraph-2-font-family: 'Wix Madefor Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --wst-paragraph-2-font-size: 14px;
     --wst-paragraph-2-font-weight: 400;
     --wst-paragraph-2-font-style: normal;
     --wst-paragraph-2-line-height: 1.5;
     
-    --wst-paragraph-3-font-family: 'Madefor Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --wst-paragraph-3-font-family: 'Wix Madefor Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --wst-paragraph-3-font-size: 12px;
     --wst-paragraph-3-font-weight: 400;
     --wst-paragraph-3-font-style: normal;
