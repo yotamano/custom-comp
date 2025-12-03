@@ -2615,7 +2615,7 @@ const App = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [serverUrl, setServerUrl] = useState(() => {
-    return localStorage.getItem('generateServerUrl') || 'http://localhost:3001/generate';
+    return localStorage.getItem('generateServerUrl') || 'http://localhost:3002';
   });
   const [showServerSettings, setShowServerSettings] = useState(false);
   const [serverUrlInput, setServerUrlInput] = useState(serverUrl);
@@ -2848,20 +2848,39 @@ export default MockComponent;
 }
 </manifest>`;
       } else {
-        const response = await fetch(serverUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ prompt: localPrompt }),
+        const requestUrl = `${serverUrl}?prompt=${encodeURIComponent(localPrompt)}`;
+        console.log('📤 Sending GET request to:', requestUrl);
+        
+        const response = await fetch(requestUrl, {
+          method: 'GET',
           signal: abortControllerRef.current.signal,
         });
         
         if (!response.ok) {
-          throw new Error(`Server error: ${response.status} ${response.statusText}`);
+          const errorBody = await response.text();
+          console.error('Server error response:', errorBody);
+          throw new Error(`Server error ${response.status}: ${errorBody || response.statusText}`);
         }
         
-        data = await response.text();
+        const responseText = await response.text();
+        console.log('Server response (raw):', responseText);
+        
+        // Server returns JSON with output field containing escaped newlines
+        try {
+          const jsonResponse = JSON.parse(responseText);
+          if (jsonResponse.output) {
+            // Convert escaped \n to actual newlines
+            data = jsonResponse.output.replace(/\\n/g, '\n');
+            console.log('Parsed output:', data);
+          } else {
+            // Fallback if no output field
+            data = responseText;
+          }
+        } catch (jsonError) {
+          // If not JSON, use raw response (shouldn't happen with this server)
+          console.log('Response is not JSON, using raw text');
+          data = responseText;
+        }
       }
       
       // Set the generated output and parse it
@@ -3334,6 +3353,7 @@ export default MockComponent;
         return <ErrorBoundary key={2}><Component2 /></ErrorBoundary>;
       case 'tokens':
         return <TokenReference />;
+      case 'generate-local':
       case 'generated': {
         const RenderedComponent = parsedOutput.component;
         if (parsedOutput.error) {
@@ -4055,7 +4075,7 @@ export default MockComponent;
                                 </label>
                                 <div style={{ display: 'flex', gap: '4px' }}>
                                   <button
-                                    onClick={() => setServerUrlInput('http://localhost:3001/generate')}
+                                    onClick={() => setServerUrlInput('http://localhost:3002')}
                                     title="Reset to default"
                                     style={{
                                       padding: '2px 6px',
@@ -4097,7 +4117,7 @@ export default MockComponent;
                                 type="text"
                                 value={serverUrlInput}
                                 onChange={(e) => setServerUrlInput(e.target.value)}
-                                placeholder="http://localhost:3001/generate"
+                                placeholder="http://localhost:3002"
                                 style={{
                                   width: '100%',
                                   padding: '6px 8px',
