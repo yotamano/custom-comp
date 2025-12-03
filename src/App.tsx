@@ -10,8 +10,13 @@ import type { TransformOptions } from '@babel/core';
 
 import ResizableSlider, { ContainerState } from './ResizableSlider';
 
-class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
-    constructor(props: { children: React.ReactNode }) {
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+  exampleInfo?: { index: number; prompt?: string; category?: string } | null;
+}
+
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, { hasError: boolean; error: Error | null }> {
+    constructor(props: ErrorBoundaryProps) {
       super(props);
       this.state = { hasError: false, error: null };
     }
@@ -21,14 +26,45 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
     }
   
     componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-      console.error("Uncaught error in component:", error, errorInfo);
+      const { exampleInfo } = this.props;
+      console.error(
+        `🔴 COMPONENT CRASH${exampleInfo ? ` - Example #${exampleInfo.index}` : ''}`,
+        {
+          example: exampleInfo,
+          error: error.message,
+          stack: error.stack,
+          componentStack: errorInfo.componentStack
+        }
+      );
+      if (exampleInfo) {
+        console.error(`📋 Crashed on example #${exampleInfo.index}: "${exampleInfo.prompt?.substring(0, 100)}..."`);
+      }
+    }
+
+    componentDidUpdate(prevProps: ErrorBoundaryProps) {
+      // Reset error state when example changes
+      if (prevProps.exampleInfo?.index !== this.props.exampleInfo?.index && this.state.hasError) {
+        this.setState({ hasError: false, error: null });
+      }
     }
   
     render() {
+      const { exampleInfo } = this.props;
       if (this.state.hasError) {
         return (
           <div style={{ padding: '1rem', background: '#fffbe6', border: '1px solid #fde047', color: '#713f12', borderRadius: '8px', height: '100%', overflow: 'auto' }}>
             <h2 style={{marginTop: 0}}>Component Error</h2>
+            {exampleInfo && (
+              <div style={{ background: '#fef3c7', padding: '8px 12px', borderRadius: '4px', marginBottom: '12px', fontSize: '13px' }}>
+                <strong>Example #{exampleInfo.index}</strong>
+                {exampleInfo.category && <span style={{ marginLeft: '8px', color: '#92400e' }}>({exampleInfo.category})</span>}
+                {exampleInfo.prompt && (
+                  <div style={{ marginTop: '4px', color: '#78350f', fontSize: '12px' }}>
+                    {exampleInfo.prompt.length > 150 ? exampleInfo.prompt.substring(0, 150) + '...' : exampleInfo.prompt}
+                  </div>
+                )}
+              </div>
+            )}
             <p>The component encountered a runtime error during rendering. This often indicates the generated React code is not robust enough to handle missing or empty props (e.g., an empty array of items), which is a violation of the prompt guidelines.</p>
             <details>
               <summary style={{cursor: 'pointer', fontWeight: '500'}}>View Error Details</summary>
@@ -1122,6 +1158,7 @@ const createDefaultValue = (schema: any): any => {
 };
 
 const buildInitialState = (node: any): any => {
+    if (!node) return {};
     let state: any = {};
     if (node.data) {
         Object.entries(node.data).forEach(([key, value]: [string, any]) => {
@@ -1131,13 +1168,16 @@ const buildInitialState = (node: any): any => {
     if (node.elements) {
         state.elementProps = {};
         Object.entries(node.elements).forEach(([key, value]: [string, any]) => {
-            state.elementProps[key] = buildInitialState(value.inlineElement);
+            // Handle both inlineElement and container element types
+            const childNode = value.inlineElement || value;
+            state.elementProps[key] = buildInitialState(childNode);
         });
     }
     return state;
 };
 
 const buildInitialCssState = (node: any): any => {
+    if (!node) return {};
     let cssState: any = {};
     if (node.cssProperties) {
         cssState.properties = {};
@@ -1148,19 +1188,24 @@ const buildInitialCssState = (node: any): any => {
     if (node.elements) {
         cssState.elements = {};
         Object.entries(node.elements).forEach(([key, value]: [string, any]) => {
-            cssState.elements[key] = buildInitialCssState(value.inlineElement);
+            // Handle both inlineElement and container element types
+            const childNode = value.inlineElement || value;
+            cssState.elements[key] = buildInitialCssState(childNode);
         });
     }
     return cssState;
 }
 
 const buildSelectorMap = (node: any, path: string[], map: { [key: string]: string[] }) => {
+    if (!node) return;
     if (node.selector) {
         map[node.selector] = path;
     }
     if (node.elements) {
         Object.entries(node.elements).forEach(([key, value]: [string, any]) => {
-            buildSelectorMap(value.inlineElement, [...path, 'elements', key], map);
+            // Handle both inlineElement and container element types
+            const childNode = value.inlineElement || value;
+            buildSelectorMap(childNode, [...path, 'elements', key], map);
         });
     }
 };
@@ -1532,10 +1577,12 @@ const ManifestNode: React.FC<{
                 const nextPropPath = [...propPath, 'elementProps', elementName];
                 const nextCssPath = [...cssPath, 'elements', elementName];
                 const nextPath = `${path}.${elementName}`;
+                // Handle both inlineElement and container element types
+                const childNode = elementValue.inlineElement || elementValue;
                 return (
                   <ManifestNode
                     key={elementName}
-                    node={elementValue.inlineElement}
+                    node={childNode}
                     nodeKey={elementName}
                     path={nextPath}
                     propPath={nextPropPath}
@@ -2556,7 +2603,25 @@ const App = () => {
   const [generatedOutput, setGeneratedOutput] = useState(initialGeneratedOutput);
   const [isMetadataPanelOpen, setIsMetadataPanelOpen] = useState(true);
   const [isPropertiesPanelOpen, setIsPropertiesPanelOpen] = useState(true);
-  const [detailsCollapsedSections, setDetailsCollapsedSections] = useState<{ [key: string]: boolean }>({});
+  const [detailsCollapsedSections, setDetailsCollapsedSections] = useState<{ [key: string]: boolean }>({
+    brief: true,
+    react: true,
+    css: true,
+    manifest: true,
+  });
+  
+  // Generate Local state
+  const [localPrompt, setLocalPrompt] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const [serverUrl, setServerUrl] = useState(() => {
+    return localStorage.getItem('generateServerUrl') || 'http://localhost:3001/generate';
+  });
+  const [showServerSettings, setShowServerSettings] = useState(false);
+  const [serverUrlInput, setServerUrlInput] = useState(serverUrl);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  
   const [manifestJson, setManifestJson] = useState<any>(null);
   const [componentProps, setComponentProps] = useState<any>({});
   const [componentCssProps, setComponentCssProps] = useState<any>({});
@@ -2646,6 +2711,182 @@ const App = () => {
     return () => clearTimeout(timeoutId);
   }, [selectedComponent, isCSVMode, currentCSVIndex, parsedOutput.component]);
 
+  // Handle local generation
+  const handleGenerate = async () => {
+    if (!localPrompt.trim()) {
+      setGenerateError('Please enter a prompt');
+      return;
+    }
+    
+    setGenerateError(null);
+    setIsGenerating(true);
+    
+    // Create abort controller for cancellation
+    abortControllerRef.current = new AbortController();
+    
+    // Mock mode for testing (when server URL contains "mock" or "test")
+    const useMock = serverUrl.toLowerCase().includes('mock') || serverUrl.toLowerCase().includes('test');
+    
+    try {
+      let data: string;
+      
+      if (useMock) {
+        // Simulate network delay
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(resolve, 1500);
+          abortControllerRef.current?.signal.addEventListener('abort', () => {
+            clearTimeout(timeout);
+            reject(new DOMException('Aborted', 'AbortError'));
+          });
+        });
+        
+        // Return mock response based on prompt
+        data = `<design-brief>
+COMPONENT ANALYSIS
+Functional Complexity: 2/5
+Expressive Complexity: 2/5
+
+DESIGN BRIEF
+Component Name: MockComponent
+Description: A mock component generated from prompt: "${localPrompt.substring(0, 50)}..."
+
+Key Features:
+- Responsive design
+- Clean styling
+- Interactive hover states
+</design-brief>
+
+<react>
+import React, { useState } from 'react';
+
+const MockComponent = () => {
+  const [count, setCount] = useState(0);
+  
+  return (
+    <div className="mock-component">
+      <h2 className="mock-title">Mock Generated Component</h2>
+      <p className="mock-description">This is a test component based on your prompt.</p>
+      <p className="mock-prompt">Prompt: "${localPrompt.substring(0, 100)}${localPrompt.length > 100 ? '...' : ''}"</p>
+      <div className="mock-counter">
+        <button className="mock-button" onClick={() => setCount(c => c - 1)}>-</button>
+        <span className="mock-count">{count}</span>
+        <button className="mock-button" onClick={() => setCount(c => c + 1)}>+</button>
+      </div>
+    </div>
+  );
+};
+
+export default MockComponent;
+</react>
+
+<css>
+.mock-component {
+  padding: 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 16px;
+  color: white;
+  font-family: system-ui, -apple-system, sans-serif;
+  text-align: center;
+}
+
+.mock-title {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.mock-description {
+  margin: 0 0 4px 0;
+  opacity: 0.9;
+  font-size: 14px;
+}
+
+.mock-prompt {
+  margin: 0 0 20px 0;
+  opacity: 0.7;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.mock-counter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.mock-button {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mock-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+.mock-count {
+  font-size: 32px;
+  font-weight: bold;
+  min-width: 60px;
+}
+</css>
+
+<manifest>
+{
+  "name": "MockComponent",
+  "description": "A mock generated component for testing",
+  "data": {},
+  "cssProperties": {}
+}
+</manifest>`;
+      } else {
+        const response = await fetch(serverUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ prompt: localPrompt }),
+          signal: abortControllerRef.current.signal,
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.status} ${response.statusText}`);
+        }
+        
+        data = await response.text();
+      }
+      
+      // Set the generated output and parse it
+      setGeneratedOutput(data);
+      parseAndCompileGeneratedOutput(data);
+      
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        setGenerateError('Generation cancelled');
+      } else {
+        setGenerateError(error.message || 'Failed to connect to server');
+      }
+    } finally {
+      setIsGenerating(false);
+      abortControllerRef.current = null;
+    }
+  };
+  
+  const handleStopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    setIsGenerating(false);
+  };
+
   const parseAndCompileGeneratedOutput = (output: string) => {
     const designBriefMatch = output.match(/<design-brief>([\s\S]*?)<\/design-brief>/);
     const reactCodeMatch = output.match(/<react>([\s\S]*?)<\/react>/);
@@ -2704,15 +2945,42 @@ const App = () => {
         // Reset image counter for each new component
         imageCounter = 0;
         
-        const initialState = buildInitialState(manifestJson.editorElement);
-        setComponentProps(initialState);
-        const initialCssState = buildInitialCssState(manifestJson.editorElement);
-        setComponentCssProps(initialCssState);
-        const newSelectorMap: { [key: string]: string[] } = {};
-        buildSelectorMap(manifestJson.editorElement, [], newSelectorMap);
-        setSelectorMap(newSelectorMap);
-        setSelectedSelector(manifestJson.editorElement.selector);
-        setSelectedElementPath([]);
+        // Get current example info for error logging
+        const currentExampleInfo = isCSVMode && csvResults[currentCSVIndex] ? {
+          index: csvResults[currentCSVIndex].index,
+          prompt: csvResults[currentCSVIndex].prompt,
+          category: csvResults[currentCSVIndex].category
+        } : null;
+        
+        try {
+          const initialState = buildInitialState(manifestJson.editorElement);
+          setComponentProps(initialState);
+          const initialCssState = buildInitialCssState(manifestJson.editorElement);
+          setComponentCssProps(initialCssState);
+          const newSelectorMap: { [key: string]: string[] } = {};
+          buildSelectorMap(manifestJson.editorElement, [], newSelectorMap);
+          setSelectorMap(newSelectorMap);
+          setSelectedSelector(manifestJson.editorElement.selector);
+          setSelectedElementPath([]);
+        } catch (error) {
+          console.error(
+            `🔴 MANIFEST PARSING ERROR${currentExampleInfo ? ` - Example #${currentExampleInfo.index}` : ''}`,
+            {
+              example: currentExampleInfo,
+              error: error instanceof Error ? error.message : error,
+              manifest: manifestJson
+            }
+          );
+          if (currentExampleInfo) {
+            console.error(`📋 Manifest parsing failed on example #${currentExampleInfo.index}: "${currentExampleInfo.prompt?.substring(0, 100)}..."`);
+          }
+          // Reset to safe state
+          setComponentProps({});
+          setComponentCssProps({});
+          setSelectorMap({});
+          setSelectedSelector(null);
+          setSelectedElementPath(null);
+        }
 
         const buildPathsToCollapse = (node: any, path: string, allPaths: { [key: string]: boolean }) => {
             if (!node) return;
@@ -2720,7 +2988,9 @@ const App = () => {
                 Object.entries(node.elements).forEach(([key, value]: [string, any]) => {
                     const newPath = `${path}.${key}`;
                     allPaths[newPath] = true; // Collapse this child element
-                    buildPathsToCollapse(value.inlineElement, newPath, allPaths);
+                    // Handle both inlineElement and container element types
+                    const childNode = value.inlineElement || value;
+                    buildPathsToCollapse(childNode, newPath, allPaths);
                 });
             }
         };
@@ -3069,8 +3339,13 @@ const App = () => {
         if (parsedOutput.error) {
           return <div style={{ color: 'red', padding: '1rem' }}><strong>Error:</strong> {parsedOutput.error}</div>;
         }
+        const currentExample = isCSVMode && csvResults[currentCSVIndex] ? {
+          index: csvResults[currentCSVIndex].index,
+          prompt: csvResults[currentCSVIndex].prompt,
+          category: csvResults[currentCSVIndex].category
+        } : null;
         return RenderedComponent ? (
-          <ErrorBoundary key={isCSVMode ? csvResults[currentCSVIndex].index : generatedOutput}>
+          <ErrorBoundary key={isCSVMode ? csvResults[currentCSVIndex].index : generatedOutput} exampleInfo={currentExample}>
             <div style={{position: 'relative', width: '100%', height: '100%'}}>
               <div ref={componentContainerRef} className="component-container">
                 {selectedSelector && isSelectionModeEnabled && (
@@ -3130,6 +3405,14 @@ const App = () => {
   return (
     <>
       <style>{`
+        @keyframes spin {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
+        }
         @keyframes slideInLeft {
           from {
             opacity: 0;
@@ -3233,6 +3516,18 @@ const App = () => {
             </svg>
             Generated Output
           </button>
+
+          <button 
+            style={navButtonStyle(selectedComponent === 'generate-local')}
+            onClick={() => setSelectedComponent('generate-local')}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Generate Local
+          </button>
           
           <button 
             style={navButtonStyle(selectedComponent === 'tokens')}
@@ -3250,7 +3545,7 @@ const App = () => {
         </div>
         
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {selectedComponent === 'generated' && (
+          {(selectedComponent === 'generated' || selectedComponent === 'generate-local') && (
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -3459,9 +3754,9 @@ const App = () => {
       </div>
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <div style={{ 
-          width: (selectedComponent === 'generated' && isCSVMode) || selectedComponent === 'tokens' ? '0px' : '320px',
-          padding: (selectedComponent === 'generated' && isCSVMode) || selectedComponent === 'tokens' ? '0' : '20px',
-          borderRight: (selectedComponent === 'generated' && isCSVMode) || selectedComponent === 'tokens' ? 'none' : '1px solid rgba(0, 0, 0, 0.06)',
+          width: (selectedComponent === 'generated' && isCSVMode) || selectedComponent === 'generate-local' || selectedComponent === 'tokens' ? '0px' : '320px',
+          padding: (selectedComponent === 'generated' && isCSVMode) || selectedComponent === 'generate-local' || selectedComponent === 'tokens' ? '0' : '20px',
+          borderRight: (selectedComponent === 'generated' && isCSVMode) || selectedComponent === 'generate-local' || selectedComponent === 'tokens' ? 'none' : '1px solid rgba(0, 0, 0, 0.06)',
           overflowY: 'auto', 
           background: '#ffffff',
           transition: 'all 0.3s ease-in-out',
@@ -3505,9 +3800,9 @@ const App = () => {
             </div>
           )}
 
-          {selectedComponent === 'generated' && (
+          {(selectedComponent === 'generated' || selectedComponent === 'generate-local') && (
             <div style={{width: '100%', display: 'flex', flexDirection: 'column', height: '100%'}}>
-              {!isCSVMode && (
+              {!isCSVMode && selectedComponent === 'generated' && (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexShrink: 0 }}>
                     <h3 style={{ margin: 0, fontSize: '13px', fontWeight: '600', color: '#09090b', letterSpacing: '-0.01em' }}>
@@ -3593,7 +3888,7 @@ const App = () => {
             <div style={{ flex: 1, overflow: 'auto', background: '#ffffff', borderRadius: '12px' }}>
               <TokenReference />
             </div>
-          ) : selectedComponent === 'generated' ? (
+          ) : (selectedComponent === 'generated' || selectedComponent === 'generate-local') ? (
             <div style={{
               display: 'flex',
               width: '100%',
@@ -3637,46 +3932,476 @@ const App = () => {
                     onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                   />
                   <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center', 
-                    padding: '14px 16px',
-                    borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
-                    background: '#fafafa',
-                    flexShrink: 0,
-                  }}>
-                    <h2 style={{ margin: 0, fontSize: '13px', fontWeight: '600', color: '#09090b', letterSpacing: '-0.01em' }}>Details</h2>
-                    <button
-                      onClick={() => setIsMetadataPanelOpen(false)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        borderRadius: '4px',
-                        width: '24px',
-                        height: '24px',
-                        cursor: 'pointer',
-                        fontSize: '16px',
-                        lineHeight: '24px',
-                        color: '#71717a',
-                        transition: 'all 0.15s ease',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: 0,
-                      }}
-                      onMouseEnter={(e) => { const target = e.currentTarget; target.style.background = '#f4f4f5'; target.style.color = '#27272a'; }}
-                      onMouseLeave={(e) => { const target = e.currentTarget; target.style.background = 'transparent'; target.style.color = '#71717a'; }}
-                    >
-                      &times;
-                    </button>
-                  </div>
-                  <div style={{ 
-                    padding: '16px', 
                     overflowY: 'auto', 
                     overflowX: 'hidden',
                     flex: 1,
                     minHeight: 0,
                   }}>
+                  {/* Generate Section Header - Only for generate-local tab */}
+                  {selectedComponent === 'generate-local' && (
+                    <div 
+                      id="generate-section-header"
+                      onClick={(e) => {
+                        if ((e.target as HTMLElement).closest('button')) return;
+                        setDetailsCollapsedSections(prev => ({ ...prev, generateSection: !prev.generateSection }));
+                        const scrollContainer = e.currentTarget.parentElement;
+                        if (scrollContainer) scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      style={{ 
+                        cursor: 'pointer', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        padding: '12px 16px',
+                        background: '#fafafa',
+                        borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 11,
+                        minHeight: '21px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <span style={{ marginRight: '8px', fontSize: '10px', color: '#71717a', width: '10px' }}>
+                          {detailsCollapsedSections.generateSection ? '▸' : '▾'}
+                        </span>
+                        <h2 style={{ margin: 0, fontSize: '13px', fontWeight: '600', color: '#09090b', letterSpacing: '-0.01em' }}>Generate</h2>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', position: 'relative' }}>
+                        {/* Settings button */}
+                        <button
+                          ref={settingsButtonRef}
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            setServerUrlInput(serverUrl);
+                            setShowServerSettings(!showServerSettings); 
+                          }}
+                          style={{
+                            background: showServerSettings ? '#f4f4f5' : 'transparent',
+                            border: 'none',
+                            borderRadius: '4px',
+                            width: '24px',
+                            height: '24px',
+                            cursor: 'pointer',
+                            color: showServerSettings ? '#27272a' : '#71717a',
+                            transition: 'all 0.15s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: 0,
+                          }}
+                          onMouseEnter={(e) => { const target = e.currentTarget; target.style.background = '#f4f4f5'; target.style.color = '#27272a'; }}
+                          onMouseLeave={(e) => { const target = e.currentTarget; if (!showServerSettings) { target.style.background = 'transparent'; target.style.color = '#71717a'; }}}
+                          title="Server settings"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                          </svg>
+                        </button>
+                        {/* Close button */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setIsMetadataPanelOpen(false); }}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            borderRadius: '4px',
+                            width: '24px',
+                            height: '24px',
+                            cursor: 'pointer',
+                            fontSize: '16px',
+                            lineHeight: '24px',
+                            color: '#71717a',
+                            transition: 'all 0.15s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: 0,
+                          }}
+                          onMouseEnter={(e) => { const target = e.currentTarget; target.style.background = '#f4f4f5'; target.style.color = '#27272a'; }}
+                          onMouseLeave={(e) => { const target = e.currentTarget; target.style.background = 'transparent'; target.style.color = '#71717a'; }}
+                        >
+                          &times;
+                        </button>
+                        
+                        {/* Settings Popover */}
+                        {showServerSettings && (
+                          <div 
+                            style={{
+                              position: 'absolute',
+                              top: '100%',
+                              right: 0,
+                              marginTop: '8px',
+                              background: '#ffffff',
+                              border: '1px solid rgba(0, 0, 0, 0.1)',
+                              borderRadius: '8px',
+                              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                              padding: '12px',
+                              width: '280px',
+                              zIndex: 100,
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div style={{ marginBottom: '8px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                <label style={{ 
+                                  fontSize: '10px', 
+                                  fontWeight: '600', 
+                                  color: '#71717a', 
+                                  textTransform: 'uppercase', 
+                                  letterSpacing: '0.05em',
+                                }}>
+                                  Server URL
+                                </label>
+                                <div style={{ display: 'flex', gap: '4px' }}>
+                                  <button
+                                    onClick={() => setServerUrlInput('http://localhost:3001/generate')}
+                                    title="Reset to default"
+                                    style={{
+                                      padding: '2px 6px',
+                                      fontSize: '9px',
+                                      fontWeight: '500',
+                                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                                      borderRadius: '3px',
+                                      background: '#ffffff',
+                                      color: '#71717a',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s ease',
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = '#f4f4f5'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = '#ffffff'; }}
+                                  >
+                                    Reset
+                                  </button>
+                                  <button
+                                    onClick={() => setServerUrlInput('mock://test')}
+                                    style={{
+                                      padding: '2px 6px',
+                                      fontSize: '9px',
+                                      fontWeight: '500',
+                                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                                      borderRadius: '3px',
+                                      background: serverUrlInput.includes('mock') ? '#f0f9ff' : '#ffffff',
+                                      color: serverUrlInput.includes('mock') ? '#0369a1' : '#71717a',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s ease',
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = '#f4f4f5'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = serverUrlInput.includes('mock') ? '#f0f9ff' : '#ffffff'; }}
+                                  >
+                                    Mock
+                                  </button>
+                                </div>
+                              </div>
+                              <input
+                                type="text"
+                                value={serverUrlInput}
+                                onChange={(e) => setServerUrlInput(e.target.value)}
+                                placeholder="http://localhost:3001/generate"
+                                style={{
+                                  width: '100%',
+                                  padding: '6px 8px',
+                                  fontSize: '11px',
+                                  fontFamily: '"Fira Code", "SF Mono", Monaco, monospace',
+                                  border: '1px solid rgba(0, 0, 0, 0.1)',
+                                  borderRadius: '4px',
+                                  outline: 'none',
+                                  boxSizing: 'border-box',
+                                }}
+                                onFocus={(e) => e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.2)'}
+                                onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.1)'}
+                              />
+                            </div>
+                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                              <button
+                                onClick={() => setShowServerSettings(false)}
+                                style={{
+                                  padding: '5px 10px',
+                                  fontSize: '10px',
+                                  fontWeight: '500',
+                                  border: '1px solid rgba(0, 0, 0, 0.1)',
+                                  borderRadius: '4px',
+                                  background: '#ffffff',
+                                  color: '#71717a',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setServerUrl(serverUrlInput);
+                                  localStorage.setItem('generateServerUrl', serverUrlInput);
+                                  setShowServerSettings(false);
+                                }}
+                                style={{
+                                  padding: '5px 10px',
+                                  fontSize: '10px',
+                                  fontWeight: '500',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  background: '#09090b',
+                                  color: '#ffffff',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Save
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Generate Section Content */}
+                  {selectedComponent === 'generate-local' && !detailsCollapsedSections.generateSection && (
+                    <div id="generate-section-content" style={{ padding: '12px 14px', borderBottom: '1px solid rgba(0, 0, 0, 0.06)' }}>
+                      {/* Prompt Textarea */}
+                      <textarea
+                        value={localPrompt}
+                        onChange={(e) => setLocalPrompt(e.target.value)}
+                        placeholder="Describe the component you want to generate..."
+                        disabled={isGenerating}
+                        style={{
+                          width: '100%',
+                          minHeight: '80px',
+                          padding: '8px 10px',
+                          fontSize: '11px',
+                          fontFamily: '"Fira Code", "SF Mono", Monaco, monospace',
+                          border: '1px solid rgba(0, 0, 0, 0.08)',
+                          borderRadius: '4px',
+                          resize: 'vertical',
+                          background: isGenerating ? '#fafafa' : '#ffffff',
+                          color: '#09090b',
+                          outline: 'none',
+                          transition: 'border-color 0.15s ease',
+                          boxSizing: 'border-box',
+                          lineHeight: '1.5',
+                        }}
+                        onFocus={(e) => { 
+                          if (!isGenerating) {
+                            e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.2)'; 
+                          }
+                        }}
+                        onBlur={(e) => { 
+                          e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; 
+                        }}
+                      />
+                      
+                      {/* Error Message */}
+                      {generateError && (
+                        <div style={{
+                          marginTop: '6px',
+                          padding: '6px 8px',
+                          background: '#fef2f2',
+                          border: '1px solid #fecaca',
+                          borderRadius: '4px',
+                          fontSize: '10px',
+                          color: '#dc2626',
+                        }}>
+                          {generateError}
+                        </div>
+                      )}
+                      
+                      {/* Action Buttons */}
+                      <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+                        <button
+                          onClick={() => {
+                            if (isGenerating) {
+                              handleStopGeneration();
+                            } else {
+                              handleGenerate();
+                            }
+                          }}
+                          disabled={!isGenerating && !localPrompt.trim()}
+                          style={{
+                            flex: 1,
+                            padding: '6px 10px',
+                            fontSize: '11px',
+                            fontWeight: '500',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: (!isGenerating && !localPrompt.trim()) ? 'not-allowed' : 'pointer',
+                            background: isGenerating ? '#ef4444' : '#09090b',
+                            color: '#ffffff',
+                            opacity: (!isGenerating && !localPrompt.trim()) ? 0.5 : 1,
+                            transition: 'all 0.15s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '5px',
+                            height: '26px',
+                          }}
+                          onMouseEnter={(e) => { 
+                            if (!(!isGenerating && !localPrompt.trim())) {
+                              e.currentTarget.style.opacity = '0.9';
+                            }
+                          }}
+                          onMouseLeave={(e) => { 
+                            if (!(!isGenerating && !localPrompt.trim())) {
+                              e.currentTarget.style.opacity = '1';
+                            }
+                          }}
+                        >
+                          {isGenerating ? (
+                            <>
+                              <svg 
+                                width="12" 
+                                height="12" 
+                                viewBox="0 0 24 24" 
+                                fill="none" 
+                                stroke="currentColor" 
+                                strokeWidth="2" 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round"
+                                style={{ animation: 'spin 1s linear infinite' }}
+                              >
+                                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                              </svg>
+                              Stop
+                            </>
+                          ) : (
+                            <>
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                              </svg>
+                              Generate
+                            </>
+                          )}
+                        </button>
+                        
+                        <button
+                          onClick={() => {
+                            setLocalPrompt('');
+                            setGenerateError(null);
+                          }}
+                          disabled={isGenerating || !localPrompt}
+                          style={{
+                            padding: '6px 10px',
+                            fontSize: '11px',
+                            fontWeight: '500',
+                            border: '1px solid rgba(0, 0, 0, 0.08)',
+                            borderRadius: '4px',
+                            cursor: (isGenerating || !localPrompt) ? 'not-allowed' : 'pointer',
+                            background: '#ffffff',
+                            color: '#71717a',
+                            opacity: (isGenerating || !localPrompt) ? 0.5 : 1,
+                            transition: 'all 0.15s ease',
+                            height: '26px',
+                          }}
+                          onMouseEnter={(e) => { 
+                            if (!(isGenerating || !localPrompt)) {
+                              e.currentTarget.style.background = '#fafafa';
+                              e.currentTarget.style.color = '#09090b';
+                            }
+                          }}
+                          onMouseLeave={(e) => { 
+                            e.currentTarget.style.background = '#ffffff';
+                            e.currentTarget.style.color = '#71717a';
+                          }}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      
+                      {/* Loading indicator */}
+                      {isGenerating && (
+                        <div style={{
+                          marginTop: '8px',
+                          padding: '6px 8px',
+                          background: '#f0f9ff',
+                          border: '1px solid #bae6fd',
+                          borderRadius: '4px',
+                          fontSize: '10px',
+                          color: '#0369a1',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}>
+                          <svg 
+                            width="10" 
+                            height="10" 
+                            viewBox="0 0 24 24" 
+                            fill="none" 
+                            stroke="currentColor" 
+                            strokeWidth="2" 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round"
+                            style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }}
+                          >
+                            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                          </svg>
+                          Generating...
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Details Section Header */}
+                  <div 
+                    id="details-section-header"
+                    onClick={(e) => {
+                      if ((e.target as HTMLElement).closest('button')) return;
+                      setDetailsCollapsedSections(prev => ({ ...prev, detailsSection: !prev.detailsSection }));
+                      const header = e.currentTarget;
+                      const scrollContainer = header.parentElement;
+                      if (scrollContainer) {
+                        const headerTop = header.offsetTop;
+                        const stickyOffset = selectedComponent === 'generate-local' ? 46 : 0;
+                        scrollContainer.scrollTo({ top: headerTop - stickyOffset, behavior: 'smooth' });
+                      }
+                    }}
+                    style={{ 
+                      cursor: 'pointer', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between',
+                      padding: '12px 16px',
+                      background: '#fafafa',
+                      borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+                      position: 'sticky',
+                      top: selectedComponent === 'generate-local' ? '46px' : 0,
+                      zIndex: 10,
+                      minHeight: '21px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                      <span style={{ marginRight: '8px', fontSize: '10px', color: '#71717a', width: '10px' }}>
+                        {detailsCollapsedSections.detailsSection ? '▸' : '▾'}
+                      </span>
+                      <h2 style={{ margin: 0, fontSize: '13px', fontWeight: '600', color: '#09090b', letterSpacing: '-0.01em' }}>Details</h2>
+                    </div>
+                    {selectedComponent !== 'generate-local' && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setIsMetadataPanelOpen(false); }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          borderRadius: '4px',
+                          width: '24px',
+                          height: '24px',
+                          cursor: 'pointer',
+                          fontSize: '16px',
+                          lineHeight: '24px',
+                          color: '#71717a',
+                          transition: 'all 0.15s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: 0,
+                        }}
+                        onMouseEnter={(e) => { const target = e.currentTarget; target.style.background = '#f4f4f5'; target.style.color = '#27272a'; }}
+                        onMouseLeave={(e) => { const target = e.currentTarget; target.style.background = 'transparent'; target.style.color = '#71717a'; }}
+                      >
+                        &times;
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Details Section Content */}
+                  {!detailsCollapsedSections.detailsSection && (
+                    <div id="details-section-content" style={{ padding: '16px' }}>
                   {isCSVMode && csvResults.length > 0 && (
                     <>
                       <div style={{
@@ -3978,6 +4703,66 @@ const App = () => {
                     )}
                   </div>
                   <hr style={{margin: '16px 0', border: 'none', borderTop: '1px solid rgba(0, 0, 0, 0.06)'}} />
+                  <div style={{ marginBottom: '16px' }}>
+                    <div 
+                      style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', justifyContent: 'space-between' }}
+                    >
+                      <div 
+                        onClick={() => setDetailsCollapsedSections(prev => ({ ...prev, css: !prev.css }))}
+                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', flex: 1 }}
+                      >
+                        <span style={{ marginRight: '6px', fontSize: '10px', color: '#71717a', width: '10px' }}>
+                          {detailsCollapsedSections.css ? '▸' : '▾'}
+                        </span>
+                        <h3 style={{ margin: 0, fontSize: '11px', fontWeight: '600', color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>CSS</h3>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCopy(parsedOutput.css, 'css');
+                        }}
+                        style={{
+                          padding: '6px',
+                          fontSize: '10px',
+                          background: copiedSection === 'css' ? '#16a34a' : 'transparent',
+                          color: copiedSection === 'css' ? '#ffffff' : '#71717a',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '24px',
+                          height: '24px',
+                        }}
+                        title={copiedSection === 'css' ? 'Copied!' : 'Copy'}
+                        onMouseEnter={(e) => { if (copiedSection !== 'css') e.currentTarget.style.background = '#f4f4f5'; }}
+                        onMouseLeave={(e) => { if (copiedSection !== 'css') e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        {copiedSection === 'css' ? (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                        ) : (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                    {!detailsCollapsedSections.css && (
+                      <pre style={{ whiteSpace: 'pre-wrap', fontFamily: '"Fira Code", "SF Mono", Monaco, monospace', fontSize: '11px', background: '#fafafa', padding: '12px', borderRadius: '6px', border: '1px solid rgba(0, 0, 0, 0.06)', lineHeight: '1.5', margin: '0 0 0 16px', overflowX: 'auto' }}>
+                        <code 
+                          dangerouslySetInnerHTML={{ 
+                            __html: Prism.highlight(parsedOutput.css, Prism.languages.css, 'css') 
+                          }}
+                        />
+                      </pre>
+                    )}
+                  </div>
+                  <hr style={{margin: '16px 0', border: 'none', borderTop: '1px solid rgba(0, 0, 0, 0.06)'}} />
                   <div>
                     <div 
                       style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', justifyContent: 'space-between' }}
@@ -4135,6 +4920,8 @@ const App = () => {
                       )
                     )}
                   </div>
+                    </div>
+                  )}
                   </div>
                 </div>
               )}

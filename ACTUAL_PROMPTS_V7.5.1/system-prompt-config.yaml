@@ -1,0 +1,20 @@
+structure:
+  - path: systemPrompt/role.md
+
+  - path: systemPrompt/core-documentation.md
+
+  - path: docs/reference.md
+    wrapperTag: reference
+
+  - path: systemPrompt/component-elements-guidelines.md
+    wrapperTag: component-elements-guidelines
+  
+  - path: systemPrompt/design-guidelines.md
+
+  - path: systemPrompt/component-react-guidelines.md
+    wrapperTag: component-react-guidelines
+
+  - path: systemPrompt/guidelines.md
+
+  - path: systemPrompt/wix-component-example.md
+    wrapperTag: wix-component-example
