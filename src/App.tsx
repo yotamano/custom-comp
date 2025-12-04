@@ -2614,6 +2614,10 @@ const App = () => {
   const [localPrompt, setLocalPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const [generationStartTime, setGenerationStartTime] = useState<number | null>(null);
+  const [generationElapsed, setGenerationElapsed] = useState<number>(0);
+  const [lastGenerationDuration, setLastGenerationDuration] = useState<number | null>(null);
+  const [showGenerationComplete, setShowGenerationComplete] = useState(false);
   const [serverUrl, setServerUrl] = useState(() => {
     return localStorage.getItem('generateServerUrl') || 'http://localhost:3002';
   });
@@ -2659,6 +2663,19 @@ const App = () => {
   useEffect(() => {
     checkServerConnection();
   }, [serverUrl]);
+
+  // Timer for generation elapsed time
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+    if (isGenerating && generationStartTime) {
+      interval = setInterval(() => {
+        setGenerationElapsed(Date.now() - generationStartTime);
+      }, 100);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isGenerating, generationStartTime]);
   
   const [manifestJson, setManifestJson] = useState<any>(null);
   const [componentProps, setComponentProps] = useState<any>({});
@@ -2758,6 +2775,10 @@ const App = () => {
     
     setGenerateError(null);
     setIsGenerating(true);
+    setShowGenerationComplete(false);
+    const startTime = Date.now();
+    setGenerationStartTime(startTime);
+    setGenerationElapsed(0);
     
     // Create abort controller for cancellation
     abortControllerRef.current = new AbortController();
@@ -2925,6 +2946,11 @@ export default MockComponent;
       setGeneratedOutput(data);
       parseAndCompileGeneratedOutput(data);
       
+      // Record completion
+      const duration = Date.now() - startTime;
+      setLastGenerationDuration(duration);
+      setShowGenerationComplete(true);
+      
     } catch (error: any) {
       if (error.name === 'AbortError') {
         setGenerateError('Generation cancelled');
@@ -2941,8 +2967,10 @@ export default MockComponent;
       } else {
         setGenerateError(error.message || 'Failed to connect to server');
       }
+      setShowGenerationComplete(false);
     } finally {
       setIsGenerating(false);
+      setGenerationStartTime(null);
       abortControllerRef.current = null;
     }
   };
@@ -4465,7 +4493,88 @@ export default MockComponent;
                           >
                             <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
                           </svg>
-                          Generating...
+                          Generating... {(generationElapsed / 1000).toFixed(1)}s
+                        </div>
+                      )}
+                      
+                      {/* Generation complete indicator */}
+                      {showGenerationComplete && !isGenerating && lastGenerationDuration !== null && (
+                        <div style={{
+                          marginTop: '8px',
+                          padding: '6px 8px',
+                          background: '#f0fdf4',
+                          border: '1px solid #bbf7d0',
+                          borderRadius: '4px',
+                          fontSize: '10px',
+                          color: '#166534',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '6px',
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <svg 
+                              width="10" 
+                              height="10" 
+                              viewBox="0 0 24 24" 
+                              fill="none" 
+                              stroke="currentColor" 
+                              strokeWidth="2" 
+                              strokeLinecap="round" 
+                              strokeLinejoin="round"
+                              style={{ flexShrink: 0 }}
+                            >
+                              <path d="M20 6L9 17l-5-5"/>
+                            </svg>
+                            Done in {(lastGenerationDuration / 1000).toFixed(1)}s
+                          </div>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(generatedOutput);
+                              setCopiedSection('full-response');
+                              setTimeout(() => setCopiedSection(null), 2000);
+                            }}
+                            style={{
+                              background: copiedSection === 'full-response' ? '#dcfce7' : 'transparent',
+                              border: '1px solid #bbf7d0',
+                              borderRadius: '3px',
+                              padding: '2px 6px',
+                              fontSize: '9px',
+                              color: copiedSection === 'full-response' ? '#166534' : '#22c55e',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              transition: 'all 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              if (copiedSection !== 'full-response') {
+                                e.currentTarget.style.background = '#dcfce7';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (copiedSection !== 'full-response') {
+                                e.currentTarget.style.background = 'transparent';
+                              }
+                            }}
+                          >
+                            {copiedSection === 'full-response' ? (
+                              <>
+                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M20 6L9 17l-5-5"/>
+                                </svg>
+                                Copied
+                              </>
+                            ) : (
+                              <>
+                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                                </svg>
+                                Copy Response
+                              </>
+                            )}
+                          </button>
                         </div>
                       )}
                     </div>
