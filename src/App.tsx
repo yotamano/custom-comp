@@ -2621,6 +2621,44 @@ const App = () => {
   const [serverUrlInput, setServerUrlInput] = useState(serverUrl);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const [serverStatus, setServerStatus] = useState<'unknown' | 'checking' | 'connected' | 'disconnected'>('unknown');
+  const [isCheckingServer, setIsCheckingServer] = useState(false);
+
+  // Check server connectivity
+  const checkServerConnection = async (urlToCheck?: string) => {
+    const url = urlToCheck || serverUrl;
+    if (url.includes('mock://')) {
+      setServerStatus('connected');
+      return true;
+    }
+    
+    setIsCheckingServer(true);
+    setServerStatus('checking');
+    
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+      
+      await fetch(url, {
+        method: 'GET',
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      setServerStatus('connected');
+      setIsCheckingServer(false);
+      return true;
+    } catch {
+      setServerStatus('disconnected');
+      setIsCheckingServer(false);
+      return false;
+    }
+  };
+
+  // Check server on mount and when URL changes
+  useEffect(() => {
+    checkServerConnection();
+  }, [serverUrl]);
   
   const [manifestJson, setManifestJson] = useState<any>(null);
   const [componentProps, setComponentProps] = useState<any>({});
@@ -2890,6 +2928,16 @@ export default MockComponent;
     } catch (error: any) {
       if (error.name === 'AbortError') {
         setGenerateError('Generation cancelled');
+      } else if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError') || error.message?.includes('404')) {
+        setServerStatus('disconnected');
+        setGenerateError(
+          `Cannot connect to server at ${serverUrl}.\n\n` +
+          `To use local generation:\n` +
+          `1. Clone the server repo\n` +
+          `2. Run: npm install && npm start\n` +
+          `3. Server should run on port 3002\n\n` +
+          `Or use "Mock" mode for testing.`
+        );
       } else {
         setGenerateError(error.message || 'Failed to connect to server');
       }
@@ -4123,7 +4171,7 @@ export default MockComponent;
                                   padding: '6px 8px',
                                   fontSize: '11px',
                                   fontFamily: '"Fira Code", "SF Mono", Monaco, monospace',
-                                  border: '1px solid rgba(0, 0, 0, 0.1)',
+                                  border: `1px solid ${serverStatus === 'connected' ? 'rgba(34, 197, 94, 0.3)' : serverStatus === 'disconnected' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(0, 0, 0, 0.1)'}`,
                                   borderRadius: '4px',
                                   outline: 'none',
                                   boxSizing: 'border-box',
@@ -4131,8 +4179,73 @@ export default MockComponent;
                                 onFocus={(e) => e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.2)'}
                                 onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.1)'}
                               />
+                              {/* Server Status Indicator */}
+                              <div style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'space-between',
+                                marginTop: '8px',
+                                padding: '6px 8px',
+                                background: serverStatus === 'connected' ? 'rgba(34, 197, 94, 0.1)' : 
+                                           serverStatus === 'disconnected' ? 'rgba(239, 68, 68, 0.1)' : 
+                                           'rgba(0, 0, 0, 0.03)',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <div style={{
+                                    width: '6px',
+                                    height: '6px',
+                                    borderRadius: '50%',
+                                    background: serverStatus === 'connected' ? '#22c55e' : 
+                                               serverStatus === 'disconnected' ? '#ef4444' : 
+                                               serverStatus === 'checking' ? '#f59e0b' : '#9ca3af',
+                                    animation: serverStatus === 'checking' ? 'pulse 1s infinite' : 'none',
+                                  }} />
+                                  <span style={{ 
+                                    color: serverStatus === 'connected' ? '#16a34a' : 
+                                           serverStatus === 'disconnected' ? '#dc2626' : '#71717a',
+                                    fontWeight: '500',
+                                  }}>
+                                    {serverStatus === 'connected' ? 'Connected' : 
+                                     serverStatus === 'disconnected' ? 'Not reachable' : 
+                                     serverStatus === 'checking' ? 'Checking...' : 'Unknown'}
+                                  </span>
+                                </div>
+                                <button
+                                  onClick={() => checkServerConnection(serverUrlInput)}
+                                  disabled={isCheckingServer}
+                                  style={{
+                                    padding: '2px 6px',
+                                    fontSize: '9px',
+                                    fontWeight: '500',
+                                    border: '1px solid rgba(0, 0, 0, 0.1)',
+                                    borderRadius: '3px',
+                                    background: '#ffffff',
+                                    color: '#71717a',
+                                    cursor: isCheckingServer ? 'not-allowed' : 'pointer',
+                                    opacity: isCheckingServer ? 0.5 : 1,
+                                  }}
+                                >
+                                  {isCheckingServer ? 'Testing...' : 'Test'}
+                                </button>
+                              </div>
+                              {serverStatus === 'disconnected' && !serverUrlInput.includes('mock') && (
+                                <div style={{
+                                  marginTop: '6px',
+                                  padding: '6px 8px',
+                                  background: 'rgba(239, 68, 68, 0.05)',
+                                  borderRadius: '4px',
+                                  fontSize: '9px',
+                                  color: '#71717a',
+                                  lineHeight: '1.4',
+                                }}>
+                                  <strong style={{ color: '#dc2626' }}>Server not running.</strong><br/>
+                                  Run your local server on port 3002, or use Mock mode for testing.
+                                </div>
+                              )}
                             </div>
-                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', marginTop: '8px' }}>
                               <button
                                 onClick={() => setShowServerSettings(false)}
                                 style={{
