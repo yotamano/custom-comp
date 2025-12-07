@@ -2618,6 +2618,19 @@ const App = () => {
   const [generationElapsed, setGenerationElapsed] = useState<number>(0);
   const [lastGenerationDuration, setLastGenerationDuration] = useState<number | null>(null);
   const [showGenerationComplete, setShowGenerationComplete] = useState(false);
+  
+  // Tabs state for generated components
+  interface GeneratedTab {
+    id: string;
+    prompt: string;
+    output: string;
+    parsedOutput: ParsedOutput;
+    timestamp: number;
+    duration: number;
+  }
+  const [generatedTabs, setGeneratedTabs] = useState<GeneratedTab[]>([]);
+  const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
+  const tabIdCounter = useRef(0);
   const [serverUrl, setServerUrl] = useState(() => {
     return localStorage.getItem('generateServerUrl') || 'http://localhost:3002';
   });
@@ -2944,10 +2957,62 @@ export default MockComponent;
       
       // Set the generated output and parse it
       setGeneratedOutput(data);
-      parseAndCompileGeneratedOutput(data);
+      
+      // Parse output for the new tab
+      const designBriefMatch = data.match(/<design-brief>([\s\S]*?)<\/design-brief>/);
+      const reactCodeMatch = data.match(/<react>([\s\S]*?)<\/react>/);
+      const cssMatch = data.match(/<css>([\s\S]*?)<\/css>/);
+      const manifestMatch = data.match(/<manifest>([\s\S]*?)<\/manifest>/);
+      
+      const designBrief = designBriefMatch ? designBriefMatch[1].trim() : 'Not found.';
+      const reactCode = reactCodeMatch ? reactCodeMatch[1].trim() : '';
+      const css = cssMatch ? cssMatch[1].trim() : '';
+      const manifest = manifestMatch ? manifestMatch[1].trim() : 'Not found.';
+      
+      let tabParsedOutput: ParsedOutput;
+      
+      if (!reactCodeMatch) {
+        tabParsedOutput = {
+          designBrief: designBrief || 'No design brief found',
+          reactCode: '',
+          css: css || '',
+          manifest: manifest || '',
+          component: null,
+          error: 'Error: <react> tag not found in output. Please ensure your pasted output contains <react>...</react> tags.',
+        };
+      } else {
+        const sanitizedReactCode = reactCode.replace(new RegExp("import\\s+['\"]\\./style\\.css['\"];?\\s*\\n?"), '');
+        const { component, error } = compileCode(sanitizedReactCode);
+        tabParsedOutput = {
+          designBrief,
+          reactCode,
+          css,
+          manifest,
+          component,
+          error,
+        };
+      }
       
       // Record completion
       const duration = Date.now() - startTime;
+      
+      // Create new tab
+      const newTab: GeneratedTab = {
+        id: `tab-${++tabIdCounter.current}`,
+        prompt: localPrompt,
+        output: data,
+        parsedOutput: tabParsedOutput,
+        timestamp: Date.now(),
+        duration,
+      };
+      
+      // Add to tabs and make it active
+      setGeneratedTabs(prev => [...prev, newTab]);
+      setActiveTabIndex(generatedTabs.length); // Point to new tab (will be added at end)
+      
+      // Also update current parsedOutput for display
+      parseAndCompileGeneratedOutput(data);
+      
       setLastGenerationDuration(duration);
       setShowGenerationComplete(true);
       
@@ -3971,15 +4036,160 @@ export default MockComponent;
             </div>
           )}
         </div>
-        <div ref={componentPreviewAreaRef} style={{ 
+        <div style={{ 
           flex: 1, 
-          padding: '20px', 
           position: 'relative', 
           background: '#fafafa',
           minHeight: 0,
           display: 'flex',
-          gap: '20px'
+          flexDirection: 'column',
         }}>
+          {/* Tab Bar for Generate Local - outside padding area */}
+          {selectedComponent === 'generate-local' && generatedTabs.length > 0 && (
+            <div style={{
+              height: '36px',
+              minHeight: '36px',
+              background: '#f4f4f5',
+              borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+              display: 'flex',
+              alignItems: 'flex-end',
+              padding: '0 16px',
+              gap: '4px',
+              overflowX: 'auto',
+              overflowY: 'hidden',
+              zIndex: 150,
+              flexShrink: 0,
+            }}>
+              {generatedTabs.map((tab, index) => (
+                <div
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveTabIndex(index);
+                    // Update the displayed output to this tab's output
+                    setGeneratedOutput(tab.output);
+                    setParsedOutput(tab.parsedOutput);
+                    // Update manifest if available
+                    try {
+                      const manifestMatch = tab.output.match(/<manifest>([\s\S]*?)<\/manifest>/);
+                      if (manifestMatch) {
+                        setManifestJson(JSON.parse(manifestMatch[1].trim()));
+                      }
+                    } catch { /* ignore parse errors */ }
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '7px 12px',
+                    paddingRight: '8px',
+                    background: activeTabIndex === index ? '#fafafa' : 'transparent',
+                    borderRadius: activeTabIndex === index ? '8px 8px 0 0' : '6px 6px 0 0',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    maxWidth: '200px',
+                    minWidth: '100px',
+                    border: activeTabIndex === index ? '1px solid rgba(0, 0, 0, 0.06)' : '1px solid transparent',
+                    borderBottom: activeTabIndex === index ? '1px solid #fafafa' : '1px solid transparent',
+                    marginBottom: '-1px',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (activeTabIndex !== index) {
+                      e.currentTarget.style.background = 'rgba(250, 250, 250, 0.6)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (activeTabIndex !== index) {
+                      e.currentTarget.style.background = 'transparent';
+                    }
+                  }}
+                >
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: activeTabIndex === index ? '500' : '400',
+                    color: activeTabIndex === index ? '#09090b' : '#71717a',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    flex: 1,
+                    lineHeight: '1.2',
+                  }}>
+                    {tab.prompt.length > 20 ? tab.prompt.substring(0, 20) + '...' : tab.prompt || `Tab ${index + 1}`}
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Remove this tab
+                      setGeneratedTabs(prev => {
+                        const newTabs = prev.filter((_, i) => i !== index);
+                        // Adjust active tab index if needed
+                        if (newTabs.length === 0) {
+                          setActiveTabIndex(0);
+                          setGeneratedOutput('');
+                          setParsedOutput({
+                            designBrief: '',
+                            reactCode: '',
+                            css: '',
+                            manifest: '',
+                            component: null,
+                            error: null,
+                          });
+                        } else if (activeTabIndex >= newTabs.length) {
+                          const newIndex = newTabs.length - 1;
+                          setActiveTabIndex(newIndex);
+                          setGeneratedOutput(newTabs[newIndex].output);
+                          setParsedOutput(newTabs[newIndex].parsedOutput);
+                        } else if (activeTabIndex === index) {
+                          // Switch to next tab or previous if at end
+                          const newIndex = index < newTabs.length ? index : index - 1;
+                          setActiveTabIndex(newIndex);
+                          setGeneratedOutput(newTabs[newIndex].output);
+                          setParsedOutput(newTabs[newIndex].parsedOutput);
+                        }
+                        return newTabs;
+                      });
+                    }}
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      padding: 0,
+                      border: 'none',
+                      background: 'transparent',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#a1a1aa',
+                      transition: 'all 0.15s ease',
+                      flexShrink: 0,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = activeTabIndex === index ? '#e4e4e7' : 'rgba(0,0,0,0.05)';
+                      e.currentTarget.style.color = '#71717a';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.color = '#a1a1aa';
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* Main content area with padding */}
+          <div ref={componentPreviewAreaRef} style={{ 
+            flex: 1, 
+            padding: '20px', 
+            position: 'relative', 
+            minHeight: 0,
+            display: 'flex',
+            gap: '20px'
+          }}>
           {selectedComponent === 'tokens' ? (
             <div style={{ flex: 1, overflow: 'auto', background: '#ffffff', borderRadius: '12px' }}>
               <TokenReference />
@@ -3988,7 +4198,7 @@ export default MockComponent;
             <div style={{
               display: 'flex',
               width: '100%',
-              position: 'relative'
+              position: 'relative',
             }}>
               {/* Floating Details Panel */}
               {isMetadataPanelOpen && (
@@ -5410,6 +5620,7 @@ export default MockComponent;
                     Show Properties
                   </button>
                 )}
+                
                 <Suspense fallback={<div>Loading...</div>}>
                   <ResizableSlider
                     containerState={containerState}
@@ -5430,6 +5641,7 @@ export default MockComponent;
               </ResizableSlider>
             </Suspense>
           )}
+          </div>
         </div>
       </div>
     </div>
